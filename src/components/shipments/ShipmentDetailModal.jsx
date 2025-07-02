@@ -1,3 +1,4 @@
+// src/components/shipments/ShipmentDetailModal.jsx
 import React from 'react';
 
 const ShipmentDetailModal = ({ shipment, onClose }) => {
