@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+/* Remove conflicting styles and keep only necessary ones */
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+/* Remove the centering and max-width from #root for full-width layout */
+#root {
+  margin: 0;
+  padding: 0;
+}
