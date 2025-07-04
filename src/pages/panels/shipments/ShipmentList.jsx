@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { getAllShipments, getShipmentById } from '../../services/shipmentService';
-import { validateToken, logout } from '../../utils/auth';
-import ShipmentDetailModal from '../../components/shipments/ShipmentDetailModal';
+import { getAllShipments, getShipmentById } from '../../../services/shipmentService';
+import { validateToken, logout } from '../../../utils/auth';
+import ShipmentDetailModal from '../../../components/shipments/ShipmentDetailModal';
 
 const ShipmentList = () => {
   const [shipments, setShipments] = useState([]);
@@ -91,7 +91,7 @@ const ShipmentList = () => {
         onClick={() => navigate('/shipments/create')}
         className="mb-4 px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
       >
-        Create New Shipment
+        Create New Shipment1
       </button>
 
       {userType === 'super_admin' && (
