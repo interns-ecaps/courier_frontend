@@ -48,7 +48,7 @@ const Login = () => {
 
       const response = await axiosInstance.post('/user/v1/login', payload);
 
-      if (response.data.success === true) {
+      if (response.data.access_token) {
         sessionStorage.setItem('accessToken', response.data.access_token);
         sessionStorage.setItem('refreshToken', response.data.refresh_token);
         sessionStorage.setItem('user', JSON.stringify(response.data.user));

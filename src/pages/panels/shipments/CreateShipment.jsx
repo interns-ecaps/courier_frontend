@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import ShipmentForm from '../../components/shipments/ShipmentForm';
-import { createShipment } from '../../services/shipmentService';
+import ShipmentForm from '../../../components/shipments/ShipmentForm';
+import { createShipment } from '../../../services/shipmentService';
 import { toast } from 'react-toastify';
 
 const CreateShipment = () => {

@@ -1,16 +1,19 @@
 // src/App.jsx
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import LandingPage from './pages/LandingPage/LandingPage';
+import LandingPage from './pages/panels/LandingPage/LandingPage';
 import Login from './pages/Auth/Login';
 import Signup from './pages/Auth/Signup';
-import Dashboard from './pages/Dashboard/Dashboard';
-import ShipmentList from './pages/shipments/ShipmentList'; // Add this line
+import Dashboard from './pages/panels/Dashboard/Dashboard';
+import ShipmentList from './pages/panels/shipments/page'; // existing
 import PrivateRoute from './routes/PrivateRoute';
 import { ToastContainer } from 'react-toastify';
-import CreateShipment from './pages/shipments/CreateShipment';
-import ViewShipment from './pages/shipments/ViewShipment';
-import EditShipment from './pages/shipments/EditShipment';
+import CreateShipment from './pages/panels/shipments/CreateShipment';
+import ViewShipment from './pages/panels/shipments/ViewShipment';
+import EditShipment from './pages/panels/shipments/EditShipment';
+
+// Import your Settings component here:
+import Settings from './pages/panels/Settings/settings.jsx';
 
 function App() {
   return (
@@ -56,10 +59,19 @@ function App() {
           }
         />
         <Route
-          path="/shipments/:id"
+          path="/shipments/:shipmentId"
           element={
             <PrivateRoute>
               <ViewShipment />
+            </PrivateRoute>
+          }
+        />
+        {/* Add Settings Route here */}
+        <Route
+          path="/settings"
+          element={
+            <PrivateRoute>
+              <Settings />
             </PrivateRoute>
           }
         />
