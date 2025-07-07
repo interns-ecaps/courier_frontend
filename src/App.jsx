@@ -11,6 +11,8 @@ import { ToastContainer } from 'react-toastify';
 import CreateShipment from './pages/panels/shipments/CreateShipment';
 import ViewShipment from './pages/panels/shipments/ViewShipment';
 import EditShipment from './pages/panels/shipments/EditShipment';
+import Address from './pages/panels/Address/address';
+
 
 // Import your Settings component here:
 import Settings from './pages/panels/Settings/settings.jsx';
@@ -72,6 +74,14 @@ function App() {
           element={
             <PrivateRoute>
               <Settings />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/address"
+          element={
+            <PrivateRoute>
+              <Address />
             </PrivateRoute>
           }
         />
