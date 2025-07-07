@@ -6,8 +6,8 @@ import { NavLink, useLocation } from "react-router-dom";
 const navItems = [
   { name: 'Dashboard', icon: LayoutDashboard },
   { name: 'Shipments', icon: Package },
+  { name: 'Address', icon: MapPin },
   { name: 'Settings', icon: Settings },
-  { name: 'Address', icon: MapPin }
 ];
 
 
