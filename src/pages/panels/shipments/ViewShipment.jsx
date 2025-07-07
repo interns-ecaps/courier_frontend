@@ -1,5 +1,7 @@
+// src/pages/panels/shipments/ViewShipment.jsx
+
 import { Edit2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -42,7 +44,7 @@ export default function ShipmentDetailsView() {
   const Navigate = useNavigate();
 
 
-  const [shipment, setShipment] = useState(shipmentsSampleData.find((shipment) => shipment.id === shipmentId));
+  // const [shipment, setShipment] = useState(shipmentsSampleData.find((shipment) => shipment.id === shipmentId));
 
   if (shipment === undefined) {
     toast.error('Shipment not found');
@@ -52,6 +54,25 @@ export default function ShipmentDetailsView() {
       </div>
     </>
   }
+
+
+  const [shipment, setShipment] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchShipment = async () => {
+      try {
+        const response = await getShipmentById(shipmentId);
+        setShipment(response.data);
+      } catch (err) {
+        toast.error('Shipment not found');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchShipment();
+  }, [shipmentId]);
+
 
   const [inlineEditField, setInlineEditField] = useState(null);
   const [inlineEditValue, setInlineEditValue] = useState('');
@@ -105,13 +126,17 @@ export default function ShipmentDetailsView() {
     setInlineEditValue(currentValue);
     setEditAllMode(false);
   };
-
-  const saveShipment = () => {
+const saveShipment = async () => {
+  try {
+    await updateShipment(shipment.id, editAllTempValue);
+    toast.success("Shipment updated!");
+    setShipment({ ...shipment, ...editAllTempValue });
     setEditAllMode(false);
-    // api call with edit wala thing
-    setShipment({ ...editAllTempValue })
-    
-  };
+  } catch (err) {
+    toast.error("Failed to update shipment");
+  }
+};
+
 
   const cancelInlineEdit = () => {
     setInlineEditField(null);

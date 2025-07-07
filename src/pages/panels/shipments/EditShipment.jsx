@@ -1,3 +1,5 @@
+// src/pages/panels/shipments/EditShipment.jsx
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ShipmentForm from '../../../components/shipments/ShipmentForm';

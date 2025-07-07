@@ -1,3 +1,5 @@
+// src/pages/panels/shipments/CreateShipment.jsx
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import ShipmentForm from '../../../components/shipments/ShipmentForm';
