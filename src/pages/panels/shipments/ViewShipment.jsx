@@ -3,8 +3,6 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
-
-
 const shipmentsSampleData = [
   {
     id: 'SHP001',
@@ -40,7 +38,6 @@ const shipmentsSampleData = [
 export default function ShipmentDetailsView() {
   const { shipmentId } = useParams()
   const Navigate = useNavigate();
-
 
   const [shipment, setShipment] = useState(shipmentsSampleData.find((shipment) => shipment.id === shipmentId));
 

@@ -153,7 +153,7 @@ const ShipmentForm = ({
         <option value="">Select Package</option>
         {packages.map((pkg) => (
           <option key={pkg.id} value={pkg.id}>
-            {pkg.description} ({pkg.weight}kg)
+            {pkg.package_type} ({pkg.weight}kg)
           </option>
         ))}
       </select>

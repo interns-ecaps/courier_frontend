@@ -1,14 +1,17 @@
 import { Edit2, Check, Plus, User, MapPin } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Settings() {
+  // Get user data from sessionStorage
+  const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+  
   // Profile data with personal and multiple addresses details
   const [profileData, setProfileData] = useState({
     personal: {
-      email: "user@example.com",
-      firstName: "User",
-      lastName: "Example",
-      phoneNumber: "+1234567890",
+      email: user.email || "user@example.com",
+      firstName: user.first_name || "User",
+      lastName: user.last_name || "Example",
+      phoneNumber: user.phone || "+1234567890",
     },
     addresses: [
       {
@@ -44,6 +47,20 @@ export default function Settings() {
   });
   const [passwordErrors, setPasswordErrors] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
+
+  // Update profile data when user data changes
+  useEffect(() => {
+    const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+    setProfileData(prev => ({
+      ...prev,
+      personal: {
+        email: user.email || prev.personal.email,
+        firstName: user.first_name || prev.personal.firstName,
+        lastName: user.last_name || prev.personal.lastName,
+        phoneNumber: user.phone || prev.personal.phoneNumber,
+      }
+    }));
+  }, []);
 
   // Helper key for editStates, separate by index for addresses
   function keyFor(section, field, index = null) {
