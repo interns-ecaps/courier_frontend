@@ -3,10 +3,11 @@ import React, { useEffect, useState } from 'react';
 import {
   getMyAddresses,
   getAddressesByUserId,
-  getUserByEmail,
+  // getUserByEmail,
 } from '../../services/addressService';
 import { getMyPackages } from '../../services/packageService';
 import { getAllCouriers } from '../../services/courierService';
+import {getUserByEmail} from '../../services/userService';
 import { toast } from 'react-toastify';
 
 const ShipmentForm = ({
