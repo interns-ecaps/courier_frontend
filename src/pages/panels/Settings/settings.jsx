@@ -7,10 +7,10 @@ export default function Settings() {
 
   const [profileData, setProfileData] = useState({
     personal: {
-      email: "user@example.com",
-      firstName: "User",
-      lastName: "Example",
-      phoneNumber: "+1234567890",
+      email: user.email || "user@example.com",
+      firstName: user.first_name || "User",
+      lastName: user.last_name || "Example",
+      phoneNumber: user.phone || "+1234567890",
     },
   });
 

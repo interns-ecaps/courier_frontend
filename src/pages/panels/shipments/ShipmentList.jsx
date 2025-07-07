@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getAllShipments, getShipmentById } from '../../../services/shipmentService';
-import { validateToken, logout } from '../../../utils/auth';
 import ShipmentDetailModal from '../../../components/shipments/ShipmentDetailModal';
 
 const ShipmentList = () => {
@@ -19,15 +18,6 @@ const ShipmentList = () => {
   const user = JSON.parse(sessionStorage.getItem('user'));
   const userType = user?.user_type;
   const userId = user?.id;
-
-  // Token validation
-  useEffect(() => {
-    const isValid = validateToken();
-    if (!isValid) {
-      logout();
-      navigate('/login');
-    }
-  }, []);
 
   // Fetch shipments
   useEffect(() => {
