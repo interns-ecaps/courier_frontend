@@ -1,22 +1,32 @@
 // src/services/shipmentService.js
+
 import axiosInstance from '../utils/axiosInstance';
-// Get all shipments
-export const getAllShipments = (params = {}) => {
-  return axiosInstance.get('/shipment/v1/shipments/', { params });
-};
 
-export const getShipmentById = (id) => {
-  return axiosInstance.get(`/shipment/v1/shipments/${id}`);
-};
-
-// Create a new shipment
-export const createShipment = (data) => {
-  return axiosInstance.post('/shipment/v1/shipments/', data);
+export const getAllShipments = async () => {
+  try {
+    const response = await axiosInstance.get('/shipment/v1/shipments/');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching shipments:', error);
+    throw error;
+  }
 };
 
 
-// Update a shipment by ID
-export const updateShipment = (id, data) => axios.put(`/shipments/${id}`, data);
+export const getShipmentById = async (id) => {
+  return await axiosInstance.get(`/shipment/v1/shipments/${id}`);
+};
 
-// Delete a shipment by ID
-export const deleteShipment = (id) => axios.delete(`/shipments/${id}`);
+export const createShipment = async (data) => {
+  return await axiosInstance.post('/shipment/v1/create_shipment/', data);
+};
+
+export const updateShipment = async (id, data) => {
+  return await axiosInstance.patch(`/shipment/v1/update_shipment/${id}`, data);
+};
+
+
+export const updateShipmentStatus = async (shipmentId, payload) => {
+  return await axiosInstance.patch(`/shipments/${shipmentId}/`, payload);
+};
+

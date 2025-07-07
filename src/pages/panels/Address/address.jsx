@@ -19,23 +19,38 @@ export default function Address() {
   const [loading, setLoading] = useState(true);
   const [addingAddress, setAddingAddress] = useState(false);
   const [newAddress, setNewAddress] = useState({
-  label: "",
-  street_address: "",
-  city: "",
-  state: "",
-  postal_code: "",
-  country_code: "",
-  landmark: "",
-});
+    label: "",
+    street_address: "",
+    city: "",
+    state: "",
+    postal_code: "",
+    country_code: "",
+    landmark: "",
+  });
 
   useEffect(() => {
     const fetchAddresses = async () => {
       try {
-        const results = await getMyAddresses();
-        setAddresses(results);
+        const response = await getMyAddresses();
+        // Extract the data from the response - the API returns a paginated response
+        const responseData = response.data || response;
+        
+        // The API response has structure: { page, limit, total, results: [...] }
+        // We need the results array
+        const addressData = responseData.results || [];
+        
+        // Ensure it's an array
+        if (Array.isArray(addressData)) {
+          setAddresses(addressData);
+        } else {
+          console.error("API response results is not an array:", addressData);
+          setAddresses([]);
+          toast.error("Invalid address data format");
+        }
       } catch (error) {
         console.error("Failed to fetch addresses:", error);
         toast.error("Failed to load addresses");
+        setAddresses([]); // Ensure addresses is always an array
       } finally {
         setLoading(false);
       }
@@ -49,8 +64,8 @@ export default function Address() {
 
   const handleAddAddress = async () => {
     if (!newAddress.label.trim() || !newAddress.street_address.trim()) {
-    toast.error("Label and Street Address are required");
-    return;
+      toast.error("Label and Street Address are required");
+      return;
     }
 
     const payload = {
@@ -69,15 +84,17 @@ export default function Address() {
       const saved = await createAddress(payload);
       toast.success("Address saved successfully!");
       setAddresses((prev) => [...prev, saved]);
+      // Fixed typo: was 'ssetNewAddress'
       setNewAddress({
         label: "",
-        streetAddress: "",
+        street_address: "",
         city: "",
         state: "",
-        postalCode: "",
-        countryCode: "",
+        postal_code: "",
+        country_code: "",
         landmark: "",
       });
+
       setAddingAddress(false);
     } catch (error) {
       console.error("Error saving address:", error);
@@ -85,18 +102,18 @@ export default function Address() {
     }
   };
 
-const handleDeleteAddress = async (index, id) => {
-  if (!confirm("Are you sure you want to delete this address?")) return;
+  const handleDeleteAddress = async (index, id) => {
+    if (!confirm("Are you sure you want to delete this address?")) return;
 
-  try {
-    await patchAddress(id, { is_deleted: true }); // ✅ mark as deleted
-    toast.success("Address deleted successfully.");
-    setAddresses((prev) => prev.filter((address) => address.id !== id)); // locally remove
-  } catch (error) {
-    console.error("Failed to delete address:", error);
-    toast.error("Failed to delete address.");
-  }
-};
+    try {
+      await patchAddress(id, { is_deleted: true }); // ✅ mark as deleted
+      toast.success("Address deleted successfully.");
+      setAddresses((prev) => prev.filter((address) => address.id !== id)); // locally remove
+    } catch (error) {
+      console.error("Failed to delete address:", error);
+      toast.error("Failed to delete address.");
+    }
+  };
 
   return (
     <div className="relative w-full mx-auto px-4 py-6">

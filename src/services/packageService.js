@@ -1,3 +1,10 @@
-import axiosInstance from '../utils/axiosInstance';
+// src/services/packageService.js
+import api from '../utils/axiosInstance';
 
-export const getMyPackages = () => axiosInstance.get('/shipment/v1/packages');
+// Only this user’s packages
+export const getMyPackages = () => {
+  const user = JSON.parse(sessionStorage.getItem('user'));
+  return api.get('/shipment/v1/packages/', {
+    params: { user_id: user.id },
+  });
+};
