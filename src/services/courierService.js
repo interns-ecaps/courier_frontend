@@ -1,3 +1,8 @@
-import axiosInstance from '../utils/axiosInstance';
+// src/services/courierService.js
+import api from '../utils/axiosInstance';
 
-export const getAllCouriers = () => axiosInstance.get('/user/v1/users?user_type=supplier');
+// Suppliers = users of type “supplier”
+export const getAllCouriers = () =>
+  api.get('/user/v1/users/', {
+    params: { user_type: 'supplier' },
+  });
