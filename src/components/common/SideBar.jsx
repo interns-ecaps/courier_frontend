@@ -1,9 +1,13 @@
-import { LayoutDashboard, Package, Settings, Truck } from "lucide-react";
+import { LayoutDashboard, Package, Settings, Truck, MapPin } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
+
+
+
 const navItems = [
   { name: 'Dashboard', icon: LayoutDashboard },
   { name: 'Shipments', icon: Package },
-  { name: 'Settings', icon: Settings }
+  { name: 'Settings', icon: Settings },
+  { name: 'Address', icon: MapPin }
 ];
 
 
