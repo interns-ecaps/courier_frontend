@@ -11,6 +11,14 @@ const EditShipment = () => {
   const navigate = useNavigate();
   const [shipmentData, setShipmentData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const storedUser = sessionStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -37,12 +45,20 @@ const EditShipment = () => {
     }
   };
 
-  if (loading) return <p className="p-6">Loading...</p>;
+  if (loading || !user) return <div>Loading...</div>;
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <h2 className="text-2xl font-bold mb-4">Edit Shipment</h2>
-      <ShipmentForm mode="update" initialValues={shipmentData} onSubmit={handleUpdate} />
+    <div className="fixed inset-0 flex items-center justify-center bg-black/30 z-50 overflow-auto">
+      <div className="w-full max-w-3xl h-[90vh] flex flex-col justify-center bg-white rounded-3xl shadow-2xl p-8 sm:p-12 border border-orange-100 overflow-auto">
+        <div className="flex items-center gap-3 mb-8">
+          <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-orange-100 text-orange-500 text-3xl font-bold shadow-lg">✏️</span>
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight flex-1">Edit Shipment</h2>
+        </div>
+        <div className="mb-8 text-gray-600 text-lg">Update the details below and save your changes. All fields are required unless marked optional.</div>
+        <div className="flex-1 flex flex-col justify-center overflow-auto">
+          <ShipmentForm mode="update" initialValues={shipmentData} onSubmit={handleUpdate} user={user} />
+        </div>
+      </div>
     </div>
   );
 };
