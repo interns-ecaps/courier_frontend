@@ -1,5 +1,10 @@
 import api from '../utils/axiosInstance';
 
+
+export const update_address = (id, data) => {
+  return api.patch(`/user/v1/update_address/{address_id}`, data);
+};
+
 export const getAddressesByUserId = (userId) =>
   api.get('/user/v1/addresses/', { params: { user_id: userId } });
 

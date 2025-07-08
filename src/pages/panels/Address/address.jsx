@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, MapPin, Check } from "lucide-react";
 import InfoCard from "../InfoCard";
 import { getMyAddresses, createAddress, patchAddress } from "../../../services/addressService";
 import { toast } from "react-toastify";
@@ -18,6 +18,7 @@ export default function Address() {
   const [addresses, setAddresses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [addingAddress, setAddingAddress] = useState(false);
+  const [settingDefault, setSettingDefault] = useState(null); // Track which address is being set as default
   const [newAddress, setNewAddress] = useState({
     label: "",
     street_address: "",
@@ -27,19 +28,12 @@ export default function Address() {
     country_code: "",
     landmark: "",
   });
-
-  useEffect(() => {
-    const fetchAddresses = async () => {
+ const fetchAddresses = async () => {
       try {
         const response = await getMyAddresses();
-        // Extract the data from the response - the API returns a paginated response
         const responseData = response.data || response;
-        
-        // The API response has structure: { page, limit, total, results: [...] }
-        // We need the results array
         const addressData = responseData.results || [];
         
-        // Ensure it's an array
         if (Array.isArray(addressData)) {
           setAddresses(addressData);
         } else {
@@ -50,11 +44,13 @@ export default function Address() {
       } catch (error) {
         console.error("Failed to fetch addresses:", error);
         toast.error("Failed to load addresses");
-        setAddresses([]); // Ensure addresses is always an array
+        setAddresses([]);
       } finally {
         setLoading(false);
       }
     };
+  useEffect(() => {
+   
     fetchAddresses();
   }, []);
 
@@ -84,7 +80,6 @@ export default function Address() {
       const saved = await createAddress(payload);
       toast.success("Address saved successfully!");
       setAddresses((prev) => [...prev, saved]);
-      // Fixed typo: was 'ssetNewAddress'
       setNewAddress({
         label: "",
         street_address: "",
@@ -94,7 +89,6 @@ export default function Address() {
         country_code: "",
         landmark: "",
       });
-
       setAddingAddress(false);
     } catch (error) {
       console.error("Error saving address:", error);
@@ -106,14 +100,31 @@ export default function Address() {
     if (!confirm("Are you sure you want to delete this address?")) return;
 
     try {
-      await patchAddress(id, { is_deleted: true }); // ✅ mark as deleted
+      await patchAddress(id, { is_deleted: true });
       toast.success("Address deleted successfully.");
-      setAddresses((prev) => prev.filter((address) => address.id !== id)); // locally remove
+      setAddresses((prev) => prev.filter((address) => address.id !== id));
     } catch (error) {
       console.error("Failed to delete address:", error);
       toast.error("Failed to delete address.");
     }
   };
+
+  const handleSetDefaultAddress = async (id) => {
+  try {
+    setSettingDefault(id); // Show loading state
+
+    await patchAddress(id, { is_default: true }); // Backend ensures only this one is default
+
+    fetchAddresses(); // Refresh updated list
+    toast.success("Default address updated!");
+  } catch (error) {
+    console.error("Failed to set default address:", error);
+    toast.error("Failed to set default address.");
+  } finally {
+    setSettingDefault(null);
+  }
+};
+
 
   return (
     <div className="relative w-full mx-auto px-4 py-6">
@@ -135,24 +146,58 @@ export default function Address() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {addresses.map((address, index) => (
-            <InfoCard
-              key={address.id}
-              title={address.label || "Address"}
-              fields={addressFields}
-              section="addresses"
-              index={index}
-              addressData={{
-                id: address.id,
-                label: address.label,
-                street_address: address.street_address,
-                city: address.city,
-                state: address.state,
-                postal_code: address.postal_code,
-                country_code: address.country_code,
-                landmark: address.landmark,
-              }}
-              onDelete={() => handleDeleteAddress(index, address.id)}
-            />
+            <div key={address.id} className={`relative ${address.is_default ? 'ring-2 ring-orange-300 bg-orange-50/30' : ''}`}>
+              <InfoCard
+                title={address.label || "Address"}
+                fields={addressFields}
+                section="addresses"
+                index={index}
+                addressData={{
+                  id: address.id,
+                  label: address.label,
+                  street_address: address.street_address,
+                  city: address.city,
+                  state: address.state,
+                  postal_code: address.postal_code,
+                  country_code: address.country_code,
+                  landmark: address.landmark,
+                }}
+                onDelete={() => handleDeleteAddress(index, address.id)}
+              />
+              
+              {/* Stacked buttons in top-right corner */}
+              <div className="absolute top-2 right-2 flex flex-col gap-1">
+                {/* Default Address Button/Badge - Top position */}
+                {address.is_default ? (
+                  <div   className="flex items-center gap-1 bg-green-100 text-green-800 px-1.5 py-0.5 rounded shadow text-xs font-medium">
+                    <Check className="w-2.5 h-2.5" />
+                    Default
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleSetDefaultAddress(address.id)}
+                    disabled={settingDefault === address.id}
+                    className="flex items-center gap-1 bg-orange-100 hover:bg-orange-200 text-orange-700 px-1.5 py-0.5 rounded shadow text-xs font-medium transition disabled:opacity-50 whitespace-nowrap"
+                    aria-label="Set as default address"
+                  >
+                    {settingDefault === address.id ? (
+                      <>
+                        <div className="w-2.5 h-2.5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                        Setting...
+                      </>
+                    ) : (
+                      <>
+                        <MapPin className="w-2.5 h-2.5" />
+                        Set Default
+                      </>
+                    )}
+                  </button>
+                )}
+                
+                {/* Edit/Delete buttons will be rendered by InfoCard below the default button */}
+              </div>
+            </div>
           ))}
         </div>
       )}
