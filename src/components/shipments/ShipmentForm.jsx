@@ -31,6 +31,7 @@ const ShipmentForm = ({
   const [packages, setPackages] = useState([]);
   const [couriers, setCouriers] = useState([]);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -67,185 +68,191 @@ const ShipmentForm = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     if (onSubmit) {
       await onSubmit(form);
     }
+    setSubmitting(false);
   };
 
   const disabled = readOnly;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && <p className="text-red-500">{error}</p>}
+    <form onSubmit={handleSubmit} className="space-y-6 w-full">
+      {error && <p className="text-red-500 text-center font-semibold mb-2">{error}</p>}
 
       {/* Email */}
-      <input
-        type="email"
-        name="recipient_email"
-        placeholder="Recipient Email"
-        value={form.recipient_email}
-        onChange={handleChange}
-        className="w-full border p-2 rounded"
-        disabled={disabled}
-        required={mode === 'create'}
-      />
+      <div className="flex flex-col gap-1">
+        <label className="text-orange-700 font-semibold text-sm mb-1">Recipient Email</label>
+        <input
+          type="email"
+          name="recipient_email"
+          placeholder="Recipient Email"
+          value={form.recipient_email}
+          onChange={handleChange}
+          className="w-full rounded-full border border-orange-200 px-5 py-3 bg-orange-50 text-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
+          disabled={disabled}
+          required={mode === 'create'}
+        />
+      </div>
 
       {/* Pickup Address */}
-      <select
-        name="pickup_address_id"
-        value={form.pickup_address_id}
-        onChange={handleChange}
-        className="w-full border p-2 rounded"
-        disabled={disabled}
-        required
-      >
-        <option value="">Select Pickup Address</option>
-        {pickupAddresses.map((addr) => (
-          <option key={addr.id} value={addr.id}>
-            {addr.address_line}, {addr.city}
-          </option>
-        ))}
-      </select>
+      <div className="flex flex-col gap-1">
+        <label className="text-orange-700 font-semibold text-sm mb-1">Pickup Address</label>
+        <select
+          name="pickup_address_id"
+          value={form.pickup_address_id}
+          onChange={handleChange}
+          className="w-full rounded-full border border-orange-200 px-5 py-3 bg-orange-50 text-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
+          disabled={disabled}
+          required
+        >
+          <option value="">Select Pickup Address</option>
+          {pickupAddresses.map((addr) => (
+            <option key={addr.id} value={addr.id}>
+              {addr.address_line}, {addr.city}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* Delivery Address */}
-      <select
-        name="delivery_address_id"
-        value={form.delivery_address_id}
-        onChange={handleChange}
-        className="w-full border p-2 rounded"
-        disabled={disabled}
-        required
-      >
-        <option value="">Select Delivery Address</option>
-        {deliveryAddresses.map((addr) => (
-          <option key={addr.id} value={addr.id}>
-            {addr.address_line}, {addr.city}
-          </option>
-        ))}
-      </select>
+      <div className="flex flex-col gap-1">
+        <label className="text-orange-700 font-semibold text-sm mb-1">Delivery Address</label>
+        <select
+          name="delivery_address_id"
+          value={form.delivery_address_id}
+          onChange={handleChange}
+          className="w-full rounded-full border border-orange-200 px-5 py-3 bg-orange-50 text-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
+          disabled={disabled}
+          required
+        >
+          <option value="">Select Delivery Address</option>
+          {deliveryAddresses.map((addr) => (
+            <option key={addr.id} value={addr.id}>
+              {addr.address_line}, {addr.city}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* Courier */}
-      <select
-        name="courier_id"
-        value={form.courier_id}
-        onChange={handleChange}
-        className="w-full border p-2 rounded"
-        disabled={disabled}
-        required
-      >
-        <option value="">Select Courier</option>
-        {couriers.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.first_name} {c.last_name}
-          </option>
-        ))}
-      </select>
+      <div className="flex flex-col gap-1">
+        <label className="text-orange-700 font-semibold text-sm mb-1">Courier</label>
+        <select
+          name="courier_id"
+          value={form.courier_id}
+          onChange={handleChange}
+          className="w-full rounded-full border border-orange-200 px-5 py-3 bg-orange-50 text-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
+          disabled={disabled}
+          required
+        >
+          <option value="">Select Courier</option>
+          {couriers.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.first_name} {c.last_name}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* Package */}
-      <select
-        name="package_id"
-        value={form.package_id}
-        onChange={handleChange}
-        className="w-full border p-2 rounded"
-        disabled={disabled}
-        required
-      >
-        <option value="">Select Package</option>
-        {packages.map((pkg) => (
-          <option key={pkg.id} value={pkg.id}>
-            {pkg.package_type} ({pkg.weight}kg)
-          </option>
-        ))}
-      </select>
+      <div className="flex flex-col gap-1">
+        <label className="text-orange-700 font-semibold text-sm mb-1">Package</label>
+        <select
+          name="package_id"
+          value={form.package_id}
+          onChange={handleChange}
+          className="w-full rounded-full border border-orange-200 px-5 py-3 bg-orange-50 text-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
+          disabled={disabled}
+          required
+        >
+          <option value="">Select Package</option>
+          {packages.map((pkg) => (
+            <option key={pkg.id} value={pkg.id}>
+              {pkg.package_type} ({pkg.weight}kg)
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* Shipment Type */}
-      <select
-        name="shipment_type"
-        value={form.shipment_type}
-        onChange={handleChange}
-        className="w-full border p-2 rounded"
-        disabled={disabled}
-      >
-        <option value="standard">Standard</option>
-        <option value="express">Express</option>
-        <option value="overnight">Overnight</option>
-        <option value="same_day">Same Day</option>
-      </select>
-
-      {/* Dates */}
-      <input
-        type="datetime-local"
-        name="pickup_date"
-        value={form.pickup_date}
-        onChange={handleChange}
-        className="w-full border p-2 rounded"
-        disabled={disabled}
-        required
-      />
-      {(mode === 'replace' || mode === 'view') && (
-        <>
-          <input
-            type="datetime-local"
-            name="delivery_date"
-            value={form.delivery_date}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            disabled={disabled}
-          />
-          <input
-            type="datetime-local"
-            name="estimated_delivery"
-            value={form.estimated_delivery}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            disabled={disabled}
-          />
-        </>
-      )}
-
-      {/* Instructions */}
-      <textarea
-        name="special_instructions"
-        value={form.special_instructions}
-        onChange={handleChange}
-        className="w-full border p-2 rounded"
-        disabled={disabled}
-        placeholder="Special instructions"
-      />
-
-      {/* Flags */}
-      <label className="block">
-        <input
-          type="checkbox"
-          name="insurance_required"
-          checked={form.insurance_required}
+      <div className="flex flex-col gap-1">
+        <label className="text-orange-700 font-semibold text-sm mb-1">Shipment Type</label>
+        <select
+          name="shipment_type"
+          value={form.shipment_type}
           onChange={handleChange}
+          className="w-full rounded-full border border-orange-200 px-5 py-3 bg-orange-50 text-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
           disabled={disabled}
-          className="mr-2"
-        />
-        Insurance Required
-      </label>
-
-      <label className="block">
-        <input
-          type="checkbox"
-          name="signature_required"
-          checked={form.signature_required}
-          onChange={handleChange}
-          disabled={disabled}
-          className="mr-2"
-        />
-        Signature Required
-      </label>
-
-      {!readOnly && (
-        <button
-          type="submit"
-          className="w-full bg-orange-500 text-white py-2 px-4 rounded hover:bg-orange-600"
         >
-          {mode === 'update' ? 'Update Shipment' : mode === 'replace' ? 'Replace Shipment' : 'Create Shipment'}
-        </button>
-      )}
+          <option value="standard">Standard</option>
+          <option value="express">Express</option>
+          <option value="overnight">Overnight</option>
+          <option value="same_day">Same Day</option>
+        </select>
+      </div>
+
+      {/* Pickup Date */}
+      <div className="flex flex-col gap-1">
+        <label className="text-orange-700 font-semibold text-sm mb-1">Pickup Date</label>
+        <input
+          type="datetime-local"
+          name="pickup_date"
+          value={form.pickup_date}
+          onChange={handleChange}
+          className="w-full rounded-full border border-orange-200 px-5 py-3 bg-orange-50 text-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none"
+          disabled={disabled}
+          required
+        />
+      </div>
+
+      {/* Special Instructions */}
+      <div className="flex flex-col gap-1">
+        <label className="text-orange-700 font-semibold text-sm mb-1">Special Instructions</label>
+        <textarea
+          name="special_instructions"
+          value={form.special_instructions}
+          onChange={handleChange}
+          className="w-full rounded-2xl border border-orange-200 px-5 py-3 bg-orange-50 text-lg focus:ring-2 focus:ring-orange-400 focus:border-orange-400 outline-none min-h-[60px]"
+          disabled={disabled}
+          placeholder="Any notes for the courier or recipient?"
+        />
+      </div>
+
+      {/* Insurance & Signature */}
+      <div className="flex gap-6 items-center">
+        <label className="flex items-center gap-2 text-orange-700 font-semibold">
+          <input
+            type="checkbox"
+            name="insurance_required"
+            checked={form.insurance_required}
+            onChange={handleChange}
+            className="accent-orange-500 w-5 h-5"
+            disabled={disabled}
+          />
+          Insurance Required
+        </label>
+        <label className="flex items-center gap-2 text-orange-700 font-semibold">
+          <input
+            type="checkbox"
+            name="signature_required"
+            checked={form.signature_required}
+            onChange={handleChange}
+            className="accent-orange-500 w-5 h-5"
+            disabled={disabled}
+          />
+          Signature Required
+        </label>
+      </div>
+
+      <button
+        type="submit"
+        className="w-full mt-4 py-3 rounded-full bg-orange-500 text-white font-bold text-lg shadow hover:bg-orange-600 transition disabled:opacity-60"
+        disabled={disabled || submitting}
+      >
+        {submitting ? 'Creating...' : 'Create Shipment'}
+      </button>
     </form>
   );
 };

@@ -1,363 +1,359 @@
-import { Edit2 } from "lucide-react";
-import { useState } from "react";
+import { Edit2, X, Package as PackageIcon, User as UserIcon, MapPin, Check, XCircle } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { getShipmentById, updateShipment, cancelShipment, acceptShipment, rejectShipment, updateShipmentTrackerStatus } from "../../../services/shipmentService";
+import { Eye, ArrowLeft, ChevronDown, ChevronRight } from "lucide-react";
+// import ShipmentStatusTracker from "../../../pages/Tracker/statusTracker";
 
-const shipmentsSampleData = [
-  {
-    id: 'SHP001',
-    sender: 'Alice Johnson',
-    recipient: 'Bob Smith',
-    status: 'In Transit',
-    origin: 'New York, NY',
-    destination: 'Los Angeles, CA',
-    weight: '5 kg',
-    deliveryDate: '2024-06-15'
-  },
-  {
-    id: 'SHP002',
-    sender: 'Mary Lee',
-    recipient: 'John Doe',
-    status: 'Delivered',
-    origin: 'Chicago, IL',
-    destination: 'Houston, TX',
-    weight: '10 kg',
-    deliveryDate: '2024-06-10'
-  },
-  {
-    id: 'SHP003',
-    sender: 'Chris Green',
-    recipient: 'Sara White',
-    status: 'Pending',
-    origin: 'San Francisco, CA',
-    destination: 'Seattle, WA',
-    weight: '3 kg',
-    deliveryDate: '2024-06-18'
-  }
+const STATUS_OPTIONS = [
+  "PENDING", "IN_TRANSIT", "DELIVERED", "CANCELLED", "RETURNED", "ACCEPTED", "REJECTED"
 ];
+
 export default function ShipmentDetailsView() {
-  const { shipmentId } = useParams()
-  const Navigate = useNavigate();
-
-  const [shipment, setShipment] = useState(shipmentsSampleData.find((shipment) => shipment.id === shipmentId));
-
-  if (shipment === undefined) {
-    toast.error('Shipment not found');
-    return <>
-      <div className="flex justify-center items-center h-screen text-3xl text-red-600">
-        <h1>Shipment not found</h1>
-      </div>
-    </>
-  }
-
+  const { shipmentId } = useParams();
+  const navigate = useNavigate();
+  const [shipment, setShipment] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [statusHistory, setStatusHistory] = useState([]);
   const [inlineEditField, setInlineEditField] = useState(null);
-  const [inlineEditValue, setInlineEditValue] = useState('');
-  const [editingShipment, setEditingShipment] = useState(null);
-  // State for edit-all mode that enables editing all fields one by one
+  const [inlineEditValue, setInlineEditValue] = useState("");
   const [editAllMode, setEditAllMode] = useState(false);
-  // Track order of fields for edit all traversal
-  const editableFields = [
-    { key: 'sender', label: 'Sender', type: 'text' },
-    { key: 'recipient', label: 'Recipient', type: 'text' },
-    { key: 'status', label: 'Status', type: 'select', options: ['Pending', 'In Transit', 'Delivered', 'Cancelled'] },
-    { key: 'origin', label: 'Origin', type: 'text' },
-    { key: 'destination', label: 'Destination', type: 'text' },
-    { key: 'weight', label: 'Weight', type: 'text' },
-    { key: 'deliveryDate', label: 'Delivery Date', type: 'date' }
-  ];
-  // Index state for edit all mode: which field currently editing
   const [editAllIndex, setEditAllIndex] = useState(0);
-  // Temp field value to keep during edit all multi-step editing
-  const [editAllTempValue, setEditAllTempValue] = useState({
-    sender: shipment.sender,
-    recipient: shipment.recipient,
-    status: shipment.status,
-    origin: shipment.origin,
-    destination: shipment.destination,
-    weight: shipment.weight,
-    deliveryDate: shipment.deliveryDate
-  });
+  const [editAllTempValue, setEditAllTempValue] = useState({});
+  const [showPackageDetails, setShowPackageDetails] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [acceptingShipment, setAcceptingShipment] = useState(false);
+  const [rejectingShipment, setRejectingShipment] = useState(false);
+  const [permissionError, setPermissionError] = useState(null);
 
-  // useEffect(() => {
-  //     // Reset inline edit when Id changes, and edit all mode states
-  //     setInlineEditField(null);
-  //     setInlineEditValue('');
-  //     setEditAllMode(false);
-  //     setEditAllIndex(0);
-  //     setEditAllTempValue('');
-  // }, [Id]);
+  // Editable fields aligned with backend
+  const editableFields = [
+    { key: "sender_name", label: "Sender", type: "text" },
+    { key: "recipient_name", label: "Recipient", type: "text" },
+    { key: "status_type", label: "Status", type: "select", options: STATUS_OPTIONS },
+    { key: "pickup_address_id", label: "Pickup Address ID", type: "text" },
+    { key: "delivery_address_text", label: "Delivery Address", type: "text" },
+    { key: "weight", label: "Weight", type: "text" },
+    { key: "delivery_date", label: "Delivery Date", type: "date" }
+  ];
 
-  const patchShipmentField = (shipmentId, field, value) => {
-    // Find shipment to patch
+  useEffect(() => {
+    const fetchShipment = async () => {
+      try {
+        const response = await getShipmentById(shipmentId);
+        setShipment(response.data);
+        // Fetch status history if available
+        if (response.data.status_history) {
+          setStatusHistory(response.data.status_history);
+        }
+        setEditAllTempValue(response.data);
+        setPermissionError(null);
+      } catch (err) {
+        if (err.response && err.response.status === 403) {
+          setPermissionError("You do not have permission to view this shipment.");
+        } else {
+          toast.error("Shipment not found");
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchShipment();
+  }, [shipmentId]);
 
-
-    // Also update viewingShipment state if the patched shipment is being viewed
-    if (viewingShipment && viewingShipment.id === shipmentId) {
-      setViewingShipment((prev) => ({ ...prev, [field]: value }));
+  // Handle status update from the tracker
+  const handleStatusUpdate = async (newStatus) => {
+    try {
+      await updateShipmentTrackerStatus(shipmentId, { action: newStatus });
+      setShipment(prev => ({ ...prev, status_type: newStatus }));
+      toast.success(`Status updated to ${newStatus.replace('_', ' ').toLowerCase()}`);
+    } catch (error) {
+      console.error("Failed to update status:", error);
+      toast.error(error.response?.data?.detail || "Failed to update status");
+      throw error; // Re-throw to handle in the component
     }
   };
 
-  const startInlineEdit = (fieldKey, currentValue) => {
-    setInlineEditField(fieldKey);
-    setInlineEditValue(currentValue);
-    setEditAllMode(false);
-  };
-
-  const saveShipment = () => {
-    setEditAllMode(false);
-    // api call with edit wala thing
-    setShipment({ ...editAllTempValue })
+  // User info
+  const user = JSON.parse(sessionStorage.getItem("user") || "{}");
+  const isSupplier = user.user_type === "supplier";
+  const isImporterExporter = user.user_type === "importer_exporter";
+  const isRejected = shipment && shipment.status_type === "REJECTED";
+  const isDelivered = shipment && shipment.status_type === "DELIVERED";
+  const isCancelled = shipment && shipment.status_type === "CANCELLED";
+  
+  // Fixed permission checks
+  const canEdit = shipment && 
+    !["CANCELLED", "DELIVERED", "REJECTED"].includes(shipment.status_type) &&
+    user.user_type === "importer_exporter" && 
+    shipment.sender_id === user.id && 
+    shipment.status_type !== "ACCEPTED";
     
-  };
+  const canCancel = shipment && 
+  isImporterExporter && 
+  ["PENDING", "IN_TRANSIT", "ACCEPTED"].includes(shipment.status_type) && 
+  !["REJECTED", "DELIVERED", "CANCELLED"].includes(shipment.status_type);
+  
+const canAcceptReject = shipment && 
+  isSupplier && 
+  shipment.status_type === "PENDING" && 
+  !["REJECTED", "DELIVERED", "CANCELLED"].includes(shipment.status_type) &&
+  shipment.payment_status !== "COMPLETED";
 
-  const cancelInlineEdit = () => {
-    setInlineEditField(null);
-    setInlineEditValue('');
-  };
+  // Check if user can update status (only suppliers can update status via the tracker)
+  const canUpdateStatus = shipment && 
+    isSupplier && 
+    !["CANCELLED", "DELIVERED", "REJECTED"].includes(shipment.status_type);
 
-  // const saveShipment = () => {
-  //   const trimmedValue = inlineEditValue.toString().trim();
-  //   // if (trimmedValue === '') {
-  //   //     alert('Value cannot be empty');
-  //   //     return;
-  //   // }
-  //   patchShipmentField(Id.id, inlineEditField, trimmedValue);
-  //   setInlineEditField(null);
-  //   setInlineEditValue('');
-  // };
-
-  // Handlers for edit all mode
-  const startEditAll = () => {
-    setEditAllMode(true);
-    setEditAllIndex(0);
-    // setEditAllTempValue(shipment[editableFields[0].key] || '');
-    setInlineEditField(null);
-  };
-
-  const cancelEditAll = () => {
-    setEditAllMode(false);
-    setEditAllIndex(0);
-    setEditAllTempValue('');
-  };
-
-  const saveEditAllField = () => {
-    const field = editableFields[editAllIndex];
-    const val = editAllTempValue.toString().trim();
-    if (val === '') {
-      alert('Value cannot be empty');
-      return;
-    }
-    patchShipmentField(shipment.id, field.key, val);
-    // Move to next field or finish edit all mode
-    if (editAllIndex < editableFields.length - 1) {
-      const nextIndex = editAllIndex + 1;
-      setEditAllIndex(nextIndex);
-      setEditAllTempValue(shipment[editableFields[nextIndex].key] || '');
-    } else {
-      // Finished editing all
-      setEditAllMode(false);
-      setEditAllIndex(0);
-      setEditAllTempValue('');
+  const handleAcceptShipment = async () => {
+    setAcceptingShipment(true);
+    try {
+      await acceptShipment(shipmentId);
+      setShipment(prev => ({ ...prev, status_type: "ACCEPTED" }));
+      toast.success("Shipment accepted successfully!");
+    } catch (error) {
+      console.error("Failed to accept shipment:", error);
+      toast.error(error.response?.data?.detail || "Failed to accept shipment");
+    } finally {
+      setAcceptingShipment(false);
     }
   };
 
-  const onEditAllValueChange = (key, e) => {
-    console.log();
-
-    setEditAllTempValue({
-      ...editAllTempValue,
-      [key]: e.target.value
-    });
+  const handleRejectShipment = async () => {
+    setRejectingShipment(true);
+    try {
+      await rejectShipment(shipmentId);
+      setShipment(prev => ({ ...prev, status_type: "REJECTED" }));
+      toast.success("Shipment rejected successfully!");
+    } catch (error) {
+      console.error("Failed to reject shipment:", error);
+      toast.error(error.response?.data?.detail || "Failed to reject shipment");
+    } finally {
+      setRejectingShipment(false);
+    }
   };
 
-  // Inline edit input for edit all mode or single inline field
-  const renderFieldInput = (field) => {
-    const value =  editAllTempValue[field.key] 
-    console.log(field.key);
-
-    if (field.type === 'select') {
-      return (
-        <select
-          autoFocus
-          value={value}
-          onChange={(e) => onEditAllValueChange(field.key, e) }
-          // onBlur={() => {
-          //   if (!editAllMode) saveShipment();
-          // }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              if (editAllMode) saveEditAllField();
-              else saveShipment();
-            } else if (e.key === 'Escape') {
-              e.preventDefault();
-              if (editAllMode) cancelEditAll();
-              else cancelInlineEdit();
-            }
-          }}
-          className="border border-orange-300 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-orange-400"
-        >
-          {field.options.map((opt) => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
-      );
-    }
-    if (field.type === 'date') {
-      return (
-        <input
-          type="date"
-          autoFocus
-          value={value}
-          onChange={(element) =>  onEditAllValueChange(field.key, element)}
-          onBlur={() => {
-            if (!editAllMode) saveShipment();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              if (editAllMode) saveEditAllField();
-              else saveShipment();
-            } else if (e.key === 'Escape') {
-              e.preventDefault();
-              if (editAllMode) cancelEditAll();
-              else cancelInlineEdit();
-            }
-          }}
-          className="border border-orange-300 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-orange-400"
-        />
-      );
-    }
-    return (
-      <input
-        type="text"
-        autoFocus
-        value={value}
-        onChange={(element) =>onEditAllValueChange(field.key, element)}
-        onBlur={() => {
-          if (!editAllMode) saveShipment();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            if (editAllMode) saveEditAllField();
-            else saveShipment();
-          } else if (e.key === 'Escape') {
-            e.preventDefault();
-            if (editAllMode) cancelEditAll();
-            else cancelInlineEdit();
-          }
-        }}
-        className="border border-orange-300 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-orange-400"
-      />
-    );
+  const statusBadge = (status) => {
+    const s = status?.toLowerCase();
+    let color = "bg-gray-200 text-gray-700";
+    if (s === "pending") color = "bg-yellow-100 text-yellow-800";
+    if (s === "in_transit") color = "bg-blue-100 text-blue-800";
+    if (s === "accepted" || s === "delivered") color = "bg-green-100 text-green-800";
+    if (s === "rejected") color = "bg-red-100 text-red-800";
+    if (s === "cancelled") color = "bg-red-200 text-red-900";
+    return <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${color}`}>{status}</span>;
   };
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-96"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div></div>;
+  }
+  if (permissionError) {
+    return <div className="flex justify-center items-center h-screen text-3xl text-red-600"><h1>{permissionError}</h1></div>;
+  }
+  if (!shipment) {
+    return <div className="flex justify-center items-center h-screen text-3xl text-red-600"><h1>Shipment not found</h1></div>;
+  }
 
   return (
-    <div className="bg-white mt-10 bg-opacity-90 backdrop-blur-md p-8 rounded-3xl border border-orange-200 shadow-lg max-w-4xl mx-auto">
-      <h2 className="text-3xl font-semibold text-gray-800 mb-6">Shipment Details - {shipment.id}</h2>
+    <div className="w-full min-h-screen py-6 px-4 bg-[#fff7f0]">
+      <div className="w-full bg-white rounded-none shadow-none overflow-visible">
+        {/* Header Bar */}
+        <div className="flex items-center gap-3 px-4 sm:px-8 py-4 sm:py-5 bg-gradient-to-r from-orange-400 to-orange-500">
+          <UserIcon className="text-white" size={24} />
+          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-wide flex-1">Shipment Details</h2>
+          <button onClick={() => navigate(-1)} className="text-white hover:text-orange-100 transition" aria-label="Back to shipments list"><ArrowLeft size={22} /></button>
+        </div>
 
-      {/* Edit All Button */}
-      {/* <div className="mb-6 flex justify-end">
-                {!editAllMode ? (
-                    <button
-                        onClick={startEditAll}
-                        className="bg-orange-500 text-white px-6 py-2 rounded-xl hover:bg-orange-600 shadow-md transition flex items-center gap-2"
-                        aria-label="Edit all shipment details"
-                    >
-                        <Edit2 className="w-5 h-5" />
-                        Edit All
-                    </button>
-                ) : (
-                    <div className="flex items-center gap-3">
-                        <span className="text-orange-600 font-semibold">
-                            Editing: {editableFields[editAllIndex].label}
-                        </span>
-                        {renderFieldInput(editableFields[editAllIndex])}
-                        <button
-                            onClick={saveEditAllField}
-                            className="bg-orange-500 text-white px-4 py-1 rounded hover:bg-orange-600 shadow transition"
-                            aria-label="Save field"
-                        >
-                            Save
-                        </button>
-                        <button
-                            onClick={cancelEditAll}
-                            className="bg-orange-100 text-orange-700 px-4 py-1 rounded hover:bg-orange-200 shadow transition"
-                            aria-label="Cancel edit all"
-                        >
-                            Cancel
-                        </button>
-                    </div> */}
-      {/* )} */}
-      {/* </div> */}
+        {/* Main Content */}
+        <div className="p-4 sm:p-8">
+          {/* Status Tracker with Update Button */}
+          {/* <ShipmentStatusTracker 
+            currentStatus={shipment.status_type} 
+            statusHistory={statusHistory}
+            onStatusUpdate={canUpdateStatus ? handleStatusUpdate : null}
+          /> */}
 
-      {/* Grid container for details */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-gray-700 text-lg">
-        {editableFields.map(({ key, label, type, options }) => {
-          // Show inline edit input if inlineEditField matches this field and not in editAll mode
-          const isEditingThisField = editAllMode || inlineEditField === key;
-          console.log(isEditingThisField);
+          {/* Top Info Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 mb-6 sm:mb-8">
+            <div>
+              <div className="text-xs text-gray-500 mb-1 flex items-center gap-1"><UserIcon size={14} className="text-orange-400" /> Sender</div>
+              <div className="font-bold text-base sm:text-lg text-gray-900 mb-2">{shipment.sender_name}</div>
+              <div className="text-xs text-gray-500 mb-1">Status</div>
+              <div className="mb-2">{statusBadge(shipment.status_type)}</div>
+              <div className="text-xs text-gray-500 mb-1 flex items-center gap-1"><MapPin size={14} className="text-orange-400" /> Pickup Address</div>
+              <div className="font-semibold text-gray-800 break-words">{shipment.pickup_address_label ?? '-'}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 mb-1 flex items-center gap-1"><UserIcon size={14} className="text-orange-400" /> Recipient</div>
+              <div className="font-bold text-base sm:text-lg text-gray-900 mb-2">{shipment.recipient_name}</div>
+              <div className="text-xs text-gray-500 mb-1">Courier</div>
+              <div className="font-semibold text-gray-800 mb-2">{shipment.courier_name ?? '-'}</div>
+              <div className="text-xs text-gray-500 mb-1 flex items-center gap-1"><MapPin size={14} className="text-orange-400" /> Delivery Address</div>
+              <div className="font-semibold text-gray-800 break-words">{shipment.delivery_address_text ?? '-'}</div>
+            </div>
+          </div>
 
-          const valueToShow = shipment[key] || '';
-          return (
-            <div
-              key={key}
-              className="relative group p-3 rounded-lg hover:bg-orange-50 cursor-default"
-            >
-              <p className="font-semibold">{label}:</p>
-              {isEditingThisField ? (
-                renderFieldInput({ key, label, type, options })
-              ) : (
-                <p className="mt-1 text-gray-800">{valueToShow}</p>
-              )}
-              {/* Edit pen button on hover - only if not editing all or editing this field */}
-              {!editAllMode && (
-                <button
-                  onClick={() => {
-                    if (!isEditingThisField) startInlineEdit(key, valueToShow);
-                  }}
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-orange-600 hover:text-orange-700"
-                  aria-label={`Edit ${label}`}
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      startInlineEdit(key, valueToShow);
-                    }
-                  }}
-                >
-                  <Edit2 className="w-5 h-5" />
-                </button>
+          {/* Rest of your existing content... */}
+          {/* Divider */}
+          <div className="border-t border-orange-100 my-4 sm:my-6" />
+          
+          {/* Package Section */}
+          <div className="bg-orange-50 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 overflow-x-auto">
+            <PackageIcon size={22} className="text-orange-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-xs text-gray-500 mb-1">Package</div>
+              <div className="font-semibold text-sm sm:text-base text-orange-700 flex items-center gap-2 flex-wrap">
+                {shipment.package_label ?? '-'}
+                {shipment.package && (
+                  <button
+                    className="ml-2 text-orange-600 hover:text-orange-800 focus:outline-none rounded-full p-1 transition hover:bg-orange-200"
+                    onClick={() => setShowPackageDetails((prev) => !prev)}
+                    aria-label={showPackageDetails ? 'Hide package details' : 'Show package details'}
+                  >
+                    {showPackageDetails ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                  </button>
+                )}
+              </div>
+              {showPackageDetails && shipment.package && (
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm">
+                  <div><span className="font-semibold">Type:</span> {shipment.package.type}</div>
+                  <div><span className="font-semibold">Weight:</span> {shipment.package.weight} kg</div>
+                  <div><span className="font-semibold">Dimensions:</span> {shipment.package.length} x {shipment.package.width} x {shipment.package.height} cm</div>
+                  <div><span className="font-semibold">Negotiable:</span> {shipment.package.is_negotiable ? 'Yes' : 'No'}</div>
+                  <div><span className="font-semibold">Estimated Cost:</span> {shipment.package.estimated_cost ?? '-'} {shipment.package.currency ?? ''}</div>
+                  <div><span className="font-semibold">Final Cost:</span> {shipment.package.final_cost ?? '-'} {shipment.package.currency ?? ''}</div>
+                </div>
               )}
             </div>
-          );
-        })}
-      </div>
+          </div>
 
-      <div className="mt-8 flex gap-4">
+          {/* Meta Info Section */}
+          <div className="bg-white rounded-xl p-4 sm:p-6 shadow border border-orange-50 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Special Instructions</div>
+              <div className="mb-3 sm:mb-4">{shipment.special_instructions ?? '-'}</div>
+              <div className="text-xs text-gray-500 mb-1">Signature Required</div>
+              <div className="mb-3 sm:mb-4">{shipment.signature_required ? 'Yes' : 'No'}</div>
+              <div className="text-xs text-gray-500 mb-1">Estimated Delivery</div>
+              {isSupplier && shipment.status_type !== 'DELIVERED' ? (
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      await updateShipment(shipment.id, { estimated_delivery: e.target.eta.value });
+                      setShipment((prev) => ({ ...prev, estimated_delivery: e.target.eta.value }));
+                      toast.success('ETA updated!');
+                    } catch (err) {
+                      toast.error('Failed to update ETA');
+                    }
+                  }}
+                  className="flex gap-2 items-center"
+                >
+                  <input
+                    type="datetime-local"
+                    name="eta"
+                    defaultValue={shipment.estimated_delivery ? new Date(shipment.estimated_delivery).toISOString().slice(0, 16) : ''}
+                    className="border p-2 rounded"
+                    required
+                  />
+                  <button type="submit" className="bg-orange-500 text-white px-3 py-1 rounded hover:bg-orange-600">Save</button>
+                </form>
+              ) : (
+                <div>{shipment.status_type === 'DELIVERED' ? '-' : (shipment.estimated_delivery ? new Date(shipment.estimated_delivery).toLocaleString() : '-')}</div>
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Insurance Required</div>
+              <div className="mb-3 sm:mb-4">{shipment.insurance_required ? 'Yes' : 'No'}</div>
+              <div className="text-xs text-gray-500 mb-1">Pickup Date</div>
+              <div className="mb-3 sm:mb-4">{shipment.pickup_date ? new Date(shipment.pickup_date).toLocaleString() : '-'}</div>
+              {shipment.status_type === 'DELIVERED' && (
+                <>
+                  <div className="text-xs text-gray-500 mb-1">Delivery Date</div>
+                  <div>{shipment.delivery_date ? new Date(shipment.delivery_date).toLocaleString() : '-'}</div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Actions - Only show if not in final states */}
+          {shipment && !["REJECTED", "DELIVERED", "CANCELLED"].includes(shipment.status_type) && (
+  <div className="flex gap-4 mt-8 items-center justify-end">
+    {canEdit && (
+      <button 
+        onClick={() => setEditAllMode(true)} 
+        className="bg-gray-200 text-gray-700 px-4 py-2 rounded shadow hover:bg-gray-300 flex items-center gap-2" 
+        aria-label="Edit shipment"
+      >
+        <Edit2 size={18} /> Edit
+      </button>
+    )}
+    {canCancel && (
+      <button 
+        onClick={() => setShowCancelConfirm(true)} 
+        className="p-2 hover:bg-orange-100 rounded-full" 
+        aria-label="Cancel shipment"
+      >
+        <X size={22} className="text-orange-500" />
+      </button>
+    )}
+    {canAcceptReject && (
+      <>
         <button
-          onClick={() => Navigate('/shipments')}
-          className="bg-orange-500 text-white px-5 py-2 rounded-xl hover:bg-orange-600 shadow-md transition"
+          onClick={handleAcceptShipment}
+          disabled={acceptingShipment}
+          className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 flex items-center gap-2 ${
+            acceptingShipment
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40'
+          }`}
+          aria-label="Accept shipment"
         >
-          Back to List
+          {acceptingShipment ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-b border-white"></div>
+          ) : (
+            <Check size={18} />
+          )}
+          Accept Shipment
         </button>
-        {!editAllMode ? (
-          <button
-            onClick={() => startEditAll()}
-            className="bg-orange-100 text-orange-700 px-5 py-2 rounded-xl hover:bg-orange-200 shadow-md transition"
-          >
-            Edit Shipment (Full Page)
-          </button>
-        ) : (
-          <button
-            onClick={() => saveShipment()}
-            className="bg-orange-100 text-orange-700 px-5 py-2 rounded-xl hover:bg-orange-200 shadow-md transition"
-          >
-            Save
-          </button>
+        <button
+          onClick={handleRejectShipment}
+          disabled={rejectingShipment}
+          className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 flex items-center gap-2 ${
+            rejectingShipment
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/40'
+          }`}
+          aria-label="Reject shipment"
+        >
+          {rejectingShipment ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-b border-white"></div>
+          ) : (
+            <XCircle size={18} />
+          )}
+          Reject Shipment
+        </button>
+      </>
+    )}
+  </div>
+)}
+        </div>
+
+        {/* Cancel Modal */}
+        {showCancelConfirm && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50">
+            <div className="bg-white rounded-xl shadow-lg p-8 max-w-sm w-full">
+              <h3 className="text-lg font-semibold mb-4 text-orange-700">Cancel Shipment</h3>
+              <p className="mb-6">Are you sure you want to cancel this shipment?</p>
+              <div className="flex gap-4 justify-end">
+                <button onClick={async () => { await cancelShipment(shipment.id); toast.success('Shipment cancelled!'); setShowCancelConfirm(false); navigate(0); }} className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">Yes, Cancel</button>
+                <button onClick={() => setShowCancelConfirm(false)} className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">No</button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
   );
-};
+}
