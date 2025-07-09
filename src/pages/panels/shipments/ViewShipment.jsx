@@ -1,47 +1,13 @@
-// src/pages/panels/shipments/ViewShipment.jsx
-
 import { Edit2, X, Package as PackageIcon, User as UserIcon, MapPin, Check, XCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { getShipmentById, updateShipment, cancelShipment, acceptShipment, rejectShipment } from "../../../services/shipmentService";
+import { getShipmentById, updateShipment, cancelShipment, acceptShipment, rejectShipment, updateShipmentTrackerStatus } from "../../../services/shipmentService";
 import { Eye, ArrowLeft, ChevronDown, ChevronRight } from "react-feather";
+import ShipmentStatusTracker from "../../../pages/Tracker/statusTracker";
 
 const STATUS_OPTIONS = [
   "PENDING", "IN_TRANSIT", "DELIVERED", "CANCELLED", "RETURNED", "ACCEPTED", "REJECTED"
-];
-
-const shipmentsSampleData = [
-  {
-    id: 'SHP001',
-    sender: 'Alice Johnson',
-    recipient: 'Bob Smith',
-    status: 'In Transit',
-    origin: 'New York, NY',
-    destination: 'Los Angeles, CA',
-    weight: '5 kg',
-    deliveryDate: '2024-06-15'
-  },
-  {
-    id: 'SHP002',
-    sender: 'Mary Lee',
-    recipient: 'John Doe',
-    status: 'Delivered',
-    origin: 'Chicago, IL',
-    destination: 'Houston, TX',
-    weight: '10 kg',
-    deliveryDate: '2024-06-10'
-  },
-  {
-    id: 'SHP003',
-    sender: 'Chris Green',
-    recipient: 'Sara White',
-    status: 'Pending',
-    origin: 'San Francisco, CA',
-    destination: 'Seattle, WA',
-    weight: '3 kg',
-    deliveryDate: '2024-06-18'
-  }
 ];
 
 export default function ShipmentDetailsView() {
@@ -96,16 +62,49 @@ export default function ShipmentDetailsView() {
     fetchShipment();
   }, [shipmentId]);
 
+  // Handle status update from the tracker
+  const handleStatusUpdate = async (newStatus) => {
+    try {
+      await updateShipmentTrackerStatus(shipmentId, { action: newStatus });
+      setShipment(prev => ({ ...prev, status_type: newStatus }));
+      toast.success(`Status updated to ${newStatus.replace('_', ' ').toLowerCase()}`);
+    } catch (error) {
+      console.error("Failed to update status:", error);
+      toast.error(error.response?.data?.detail || "Failed to update status");
+      throw error; // Re-throw to handle in the component
+    }
+  };
+
   // User info
   const user = JSON.parse(sessionStorage.getItem("user") || "{}");
   const isSupplier = user.user_type === "supplier";
   const isImporterExporter = user.user_type === "importer_exporter";
   const isRejected = shipment && shipment.status_type === "REJECTED";
-  const canEdit = shipment && !["CANCELLED", "DELIVERED", "REJECTED"].includes(shipment.status_type) &&
-    user.user_type === "importer_exporter" && shipment.sender_id === user.id && shipment.status_type !== "ACCEPTED";
-  const canCancel = shipment && isImporterExporter && ["PENDING", "IN_TRANSIT", "ACCEPTED"].includes(shipment.status_type) && !isRejected;
-  // Accept/Reject for supplier: status is pending or in_transit and payment is not completed
-  const canAcceptReject = shipment && isSupplier && ["PENDING", "IN_TRANSIT"].includes(shipment.status_type) && shipment.payment_status !== "COMPLETED" && !isRejected;
+  const isDelivered = shipment && shipment.status_type === "DELIVERED";
+  const isCancelled = shipment && shipment.status_type === "CANCELLED";
+
+  // Fixed permission checks
+  const canEdit = shipment &&
+    !["CANCELLED", "DELIVERED", "REJECTED"].includes(shipment.status_type) &&
+    user.user_type === "importer_exporter" &&
+    shipment.sender_id === user.id &&
+    shipment.status_type !== "ACCEPTED";
+
+  const canCancel = shipment &&
+    isImporterExporter &&
+    ["PENDING", "IN_TRANSIT", "ACCEPTED"].includes(shipment.status_type) &&
+    !["REJECTED", "DELIVERED", "CANCELLED"].includes(shipment.status_type);
+
+  const canAcceptReject = shipment &&
+    isSupplier &&
+    shipment.status_type === "PENDING" &&
+    !["REJECTED", "DELIVERED", "CANCELLED"].includes(shipment.status_type) &&
+    shipment.payment_status !== "COMPLETED";
+
+  // Check if user can update status (only suppliers can update status via the tracker)
+  const canUpdateStatus = shipment &&
+    isSupplier &&
+    !["CANCELLED", "DELIVERED", "REJECTED"].includes(shipment.status_type);
 
   const handleAcceptShipment = async () => {
     setAcceptingShipment(true);
@@ -157,16 +156,24 @@ export default function ShipmentDetailsView() {
   }
 
   return (
-    <div className="w-full min-h-screen flex flex-col items-center justify-center py-6 px-2 sm:px-4 md:px-8 bg-[#fff7f0]">
-      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden mx-auto">
+    <div className="w-full min-h-screen py-6 px-4 bg-[#fff7f0]">
+      <div className="w-full bg-white rounded-none shadow-none overflow-visible">
         {/* Header Bar */}
         <div className="flex items-center gap-3 px-4 sm:px-8 py-4 sm:py-5 bg-gradient-to-r from-orange-400 to-orange-500">
           <UserIcon className="text-white" size={24} />
           <h2 className="text-xl sm:text-2xl font-bold text-white tracking-wide flex-1">Shipment Details</h2>
           <button onClick={() => navigate(-1)} className="text-white hover:text-orange-100 transition" aria-label="Back to shipments list"><ArrowLeft size={22} /></button>
         </div>
+
         {/* Main Content */}
         <div className="p-4 sm:p-8">
+          {/* Status Tracker with Update Button */}
+          <ShipmentStatusTracker
+            currentStatus={shipment.status_type}
+            statusHistory={statusHistory}
+            onStatusUpdate={canUpdateStatus ? handleStatusUpdate : null}
+          />
+
           {/* Top Info Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 mb-6 sm:mb-8">
             <div>
@@ -186,8 +193,11 @@ export default function ShipmentDetailsView() {
               <div className="font-semibold text-gray-800 break-words">{shipment.delivery_address_text ?? '-'}</div>
             </div>
           </div>
+
+          {/* Rest of your existing content... */}
           {/* Divider */}
           <div className="border-t border-orange-100 my-4 sm:my-6" />
+
           {/* Package Section */}
           <div className="bg-orange-50 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 overflow-x-auto">
             <PackageIcon size={22} className="text-orange-400 flex-shrink-0" />
@@ -196,13 +206,13 @@ export default function ShipmentDetailsView() {
               <div className="font-semibold text-sm sm:text-base text-orange-700 flex items-center gap-2 flex-wrap">
                 {shipment.package_label ?? '-'}
                 {shipment.package && (
-                    <button
+                  <button
                     className="ml-2 text-orange-600 hover:text-orange-800 focus:outline-none rounded-full p-1 transition hover:bg-orange-200"
                     onClick={() => setShowPackageDetails((prev) => !prev)}
                     aria-label={showPackageDetails ? 'Hide package details' : 'Show package details'}
                   >
                     {showPackageDetails ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                    </button>
+                  </button>
                 )}
               </div>
               {showPackageDetails && shipment.package && (
@@ -217,6 +227,7 @@ export default function ShipmentDetailsView() {
               )}
             </div>
           </div>
+
           {/* Meta Info Section */}
           <div className="bg-white rounded-xl p-4 sm:p-6 shadow border border-orange-50 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div>
@@ -242,7 +253,7 @@ export default function ShipmentDetailsView() {
                   <input
                     type="datetime-local"
                     name="eta"
-                    defaultValue={shipment.estimated_delivery ? new Date(shipment.estimated_delivery).toISOString().slice(0,16) : ''}
+                    defaultValue={shipment.estimated_delivery ? new Date(shipment.estimated_delivery).toISOString().slice(0, 16) : ''}
                     className="border p-2 rounded"
                     required
                   />
@@ -265,29 +276,37 @@ export default function ShipmentDetailsView() {
               )}
             </div>
           </div>
-          {/* Actions */}
-          {!isRejected && (
+
+          {/* Actions - Only show if not in final states */}
+          {shipment && !["REJECTED", "DELIVERED", "CANCELLED"].includes(shipment.status_type) && (
             <div className="flex gap-4 mt-8 items-center justify-end">
               {canEdit && (
-                <button onClick={() => setEditAllMode(true)} className="bg-gray-200 text-gray-700 px-4 py-2 rounded shadow hover:bg-gray-300 flex items-center gap-2" aria-label="Edit shipment">
+                <button
+                  onClick={() => setEditAllMode(true)}
+                  className="bg-gray-200 text-gray-700 px-4 py-2 rounded shadow hover:bg-gray-300 flex items-center gap-2"
+                  aria-label="Edit shipment"
+                >
                   <Edit2 size={18} /> Edit
-                        </button>
+                </button>
               )}
               {canCancel && (
-                <button onClick={() => setShowCancelConfirm(true)} className="p-2 hover:bg-orange-100 rounded-full" aria-label="Cancel shipment">
+                <button
+                  onClick={() => setShowCancelConfirm(true)}
+                  className="p-2 hover:bg-orange-100 rounded-full"
+                  aria-label="Cancel shipment"
+                >
                   <X size={22} className="text-orange-500" />
                 </button>
               )}
               {canAcceptReject && (
                 <>
-        <button
+                  <button
                     onClick={handleAcceptShipment}
                     disabled={acceptingShipment}
-                    className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 flex items-center gap-2 ${
-                      acceptingShipment
+                    className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 flex items-center gap-2 ${acceptingShipment
                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40'
-                    }`}
+                      }`}
                     aria-label="Accept shipment"
                   >
                     {acceptingShipment ? (
@@ -296,15 +315,14 @@ export default function ShipmentDetailsView() {
                       <Check size={18} />
                     )}
                     Accept Shipment
-        </button>
-          <button
+                  </button>
+                  <button
                     onClick={handleRejectShipment}
                     disabled={rejectingShipment}
-                    className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 flex items-center gap-2 ${
-                      rejectingShipment
+                    className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 flex items-center gap-2 ${rejectingShipment
                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/40'
-                    }`}
+                      }`}
                     aria-label="Reject shipment"
                   >
                     {rejectingShipment ? (
@@ -313,12 +331,13 @@ export default function ShipmentDetailsView() {
                       <XCircle size={18} />
                     )}
                     Reject Shipment
-          </button>
+                  </button>
                 </>
               )}
             </div>
           )}
         </div>
+
         {/* Cancel Modal */}
         {showCancelConfirm && (
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50">
