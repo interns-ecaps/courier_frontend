@@ -197,7 +197,6 @@ export default function ShipmentDetailsView() {
           {/* Rest of your existing content... */}
           {/* Divider */}
           <div className="border-t border-orange-100 my-4 sm:my-6" />
-
           {/* Package Section */}
           <div className="bg-orange-50 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 overflow-x-auto">
             <PackageIcon size={22} className="text-orange-400 flex-shrink-0" />

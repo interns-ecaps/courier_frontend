@@ -114,6 +114,7 @@ const ShipmentForm = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     if (onSubmit) {
       try {
         const {
@@ -148,6 +149,7 @@ const ShipmentForm = ({
         toast.error('Submission failed');
       }
     }
+    setSubmitting(false);
   };
 
   const disabled = readOnly;

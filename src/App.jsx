@@ -12,6 +12,8 @@ import CreateShipment from './pages/panels/shipments/CreateShipment';
 import ViewShipment from './pages/panels/shipments/ViewShipment';
 import EditShipment from './pages/panels/shipments/EditShipment';
 import Address from './pages/panels/Address/address';
+import ForgotPassword from './pages/Auth/ForgotPassword';
+import ResetPassword from './pages/Auth/ResetPassword';
 
 
 // Import your Settings component here:
@@ -26,6 +28,8 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Protected Routes */}
         <Route
