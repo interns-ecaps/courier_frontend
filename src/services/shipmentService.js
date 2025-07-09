@@ -25,6 +25,9 @@ export const updateShipment = async (id, data) => {
   return await axiosInstance.patch(`/shipment/v1/update_shipment/${id}`, data);
 };
 
+export const updateShipmentTrackerStatus = async (id, data) => {
+  return await axiosInstance.post(`/shipment/v1/shipments/${id}/accept_reject/`, data);
+};
 
 export const updateShipmentStatus = async (shipmentId, payload) => {
   return await axiosInstance.patch(`/shipment/v1/update_shipment/${shipmentId}`, payload);

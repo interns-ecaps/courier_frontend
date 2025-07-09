@@ -61,7 +61,7 @@ export default function Shipment() {
                     }; // importer/exporter
                 }
 
-response = await getAllShipments(filters);
+                response = await getAllShipments(filters);
 
                 console.log("Raw response:", response);
                 console.log("Response structure:", {
@@ -201,11 +201,14 @@ response = await getAllShipments(filters);
     const baseTabs = [
         { key: "open", label: "Open" },
         { key: "accepted", label: "Accepted" },
+        { key: "delivered", label: "Delivered" },
         { key: "rejected", label: "Rejected" },
     ];
     const tabCounts = {
-        open: shipments.filter(s => ["pending", "in_transit"].includes(s.status_type?.toLowerCase())).length,
-        accepted: shipments.filter(s => ["accepted", "delivered"].includes(s.status_type?.toLowerCase())).length,
+        // open: shipments.filter(s => ["pending", "in_transit"].includes(s.status_type?.toLowerCase())).length,
+        open: shipments.filter(s => s.status_type?.toLowerCase() === "pending").length,
+        accepted: shipments.filter(s => s.status_type?.toLowerCase() === "accepted").length,
+        delivered: shipments.filter(s => s.status_type?.toLowerCase() === "delivered").length,
         rejected: shipments.filter(s => ["rejected"].includes(s.status_type?.toLowerCase())).length,
         cancelled: shipments.filter(s => ["cancelled"].includes(s.status_type?.toLowerCase())).length,
     };
@@ -217,11 +220,14 @@ response = await getAllShipments(filters);
         const status = shipment.status_type?.toLowerCase();
         if (user?.user_type === "supplier") {
             if (activeTab === "open") return status === "pending";
-            if (activeTab === "accepted") return ["accepted", "delivered"].includes(status);
+            if (activeTab === "accepted") return status === "accepted";
+            if (activeTab === "delivered") return status === "delivered";
             if (activeTab === "rejected") return ["rejected", "cancelled"].includes(status);
         }
-        if (activeTab === "open") return ["pending", "in_transit"].includes(status);
-        if (activeTab === "accepted") return ["accepted", "delivered"].includes(status);
+        // if (activeTab === "open") return ["pending", "in_transit"].includes(status);
+        if (activeTab === "open") return status === "pending";
+        if (activeTab === "accepted") return status === "accepted";
+        if (activeTab === "delivered") return status === "delivered";
         if (activeTab === "rejected") return ["rejected"].includes(status);
         if (user?.user_type === "importer_exporter" && activeTab === "cancelled") return status === "cancelled";
         return true;
@@ -248,7 +254,7 @@ response = await getAllShipments(filters);
     const statusBadge = (status) => {
         const s = status?.toLowerCase();
         let classes = "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold";
-        
+
         if (s === "pending") classes += " bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 border border-yellow-300";
         else if (s === "in_transit") classes += " bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 border border-blue-300";
         else if (s === "accepted" || s === "delivered") classes += " bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300";
@@ -258,13 +264,12 @@ response = await getAllShipments(filters);
 
         return (
             <span className={classes}>
-                <div className={`w-2 h-2 rounded-full mr-2 ${
-                    s === "pending" ? "bg-yellow-500" :
-                    s === "in_transit" ? "bg-blue-500" :
-                    (s === "accepted" || s === "delivered") ? "bg-green-500" :
-                    s === "rejected" ? "bg-red-500" :
-                    s === "cancelled" ? "bg-gray-500" : "bg-gray-400"
-                }`}></div>
+                <div className={`w-2 h-2 rounded-full mr-2 ${s === "pending" ? "bg-yellow-500" :
+                        s === "in_transit" ? "bg-blue-500" :
+                            (s === "accepted" || s === "delivered") ? "bg-green-500" :
+                                s === "rejected" ? "bg-red-500" :
+                                    s === "cancelled" ? "bg-gray-500" : "bg-gray-400"
+                    }`}></div>
                 {status?.charAt(0).toUpperCase() + status?.slice(1).toLowerCase()}
             </span>
         );
@@ -301,7 +306,7 @@ response = await getAllShipments(filters);
 
                 {/* Table Container */}
                 <div className="bg-white rounded-2xl shadow-lg p-6 border border-orange-100">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto w-full">
                         <table className="w-full">
                             <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                                 <tr>
@@ -420,11 +425,10 @@ response = await getAllShipments(filters);
                                                             <button
                                                                 onClick={() => handleAcceptShipment(shipment.id)}
                                                                 disabled={acceptingShipmentId === shipment.id}
-                                                                className={`px-3 py-1.5 text-sm rounded-lg transition-all duration-200 transform hover:scale-105 font-medium flex items-center gap-1.5 ${
-                                                                    acceptingShipmentId === shipment.id
+                                                                className={`px-3 py-1.5 text-sm rounded-lg transition-all duration-200 transform hover:scale-105 font-medium flex items-center gap-1.5 ${acceptingShipmentId === shipment.id
                                                                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                                                         : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40'
-                                                                }`}
+                                                                    }`}
                                                                 aria-label="Accept shipment"
                                                             >
                                                                 {acceptingShipmentId === shipment.id ? (
@@ -437,11 +441,10 @@ response = await getAllShipments(filters);
                                                             <button
                                                                 onClick={() => handleRejectShipment(shipment.id)}
                                                                 disabled={rejectingShipmentId === shipment.id}
-                                                                className={`px-3 py-1.5 text-sm rounded-lg transition-all duration-200 transform hover:scale-105 font-medium flex items-center gap-1.5 ${
-                                                                    rejectingShipmentId === shipment.id
+                                                                className={`px-3 py-1.5 text-sm rounded-lg transition-all duration-200 transform hover:scale-105 font-medium flex items-center gap-1.5 ${rejectingShipmentId === shipment.id
                                                                         ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                                                         : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/40'
-                                                                }`}
+                                                                    }`}
                                                                 aria-label="Reject shipment"
                                                             >
                                                                 {rejectingShipmentId === shipment.id ? (
