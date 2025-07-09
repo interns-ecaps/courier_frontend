@@ -3,8 +3,8 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { getShipmentById, updateShipment, cancelShipment, acceptShipment, rejectShipment, updateShipmentTrackerStatus } from "../../../services/shipmentService";
-import { Eye, ArrowLeft, ChevronDown, ChevronRight } from "lucide-react";
-// import ShipmentStatusTracker from "../../../pages/Tracker/statusTracker";
+import { Eye, ArrowLeft, ChevronDown, ChevronRight } from "react-feather";
+import ShipmentStatusTracker from "../../../pages/Tracker/statusTracker";
 
 const STATUS_OPTIONS = [
   "PENDING", "IN_TRANSIT", "DELIVERED", "CANCELLED", "RETURNED", "ACCEPTED", "REJECTED"
@@ -82,28 +82,28 @@ export default function ShipmentDetailsView() {
   const isRejected = shipment && shipment.status_type === "REJECTED";
   const isDelivered = shipment && shipment.status_type === "DELIVERED";
   const isCancelled = shipment && shipment.status_type === "CANCELLED";
-  
+
   // Fixed permission checks
-  const canEdit = shipment && 
+  const canEdit = shipment &&
     !["CANCELLED", "DELIVERED", "REJECTED"].includes(shipment.status_type) &&
-    user.user_type === "importer_exporter" && 
-    shipment.sender_id === user.id && 
+    user.user_type === "importer_exporter" &&
+    shipment.sender_id === user.id &&
     shipment.status_type !== "ACCEPTED";
-    
-  const canCancel = shipment && 
-  isImporterExporter && 
-  ["PENDING", "IN_TRANSIT", "ACCEPTED"].includes(shipment.status_type) && 
-  !["REJECTED", "DELIVERED", "CANCELLED"].includes(shipment.status_type);
-  
-const canAcceptReject = shipment && 
-  isSupplier && 
-  shipment.status_type === "PENDING" && 
-  !["REJECTED", "DELIVERED", "CANCELLED"].includes(shipment.status_type) &&
-  shipment.payment_status !== "COMPLETED";
+
+  const canCancel = shipment &&
+    isImporterExporter &&
+    ["PENDING", "IN_TRANSIT", "ACCEPTED"].includes(shipment.status_type) &&
+    !["REJECTED", "DELIVERED", "CANCELLED"].includes(shipment.status_type);
+
+  const canAcceptReject = shipment &&
+    isSupplier &&
+    shipment.status_type === "PENDING" &&
+    !["REJECTED", "DELIVERED", "CANCELLED"].includes(shipment.status_type) &&
+    shipment.payment_status !== "COMPLETED";
 
   // Check if user can update status (only suppliers can update status via the tracker)
-  const canUpdateStatus = shipment && 
-    isSupplier && 
+  const canUpdateStatus = shipment &&
+    isSupplier &&
     !["CANCELLED", "DELIVERED", "REJECTED"].includes(shipment.status_type);
 
   const handleAcceptShipment = async () => {
@@ -168,11 +168,11 @@ const canAcceptReject = shipment &&
         {/* Main Content */}
         <div className="p-4 sm:p-8">
           {/* Status Tracker with Update Button */}
-          {/* <ShipmentStatusTracker 
-            currentStatus={shipment.status_type} 
+          <ShipmentStatusTracker
+            currentStatus={shipment.status_type}
             statusHistory={statusHistory}
             onStatusUpdate={canUpdateStatus ? handleStatusUpdate : null}
-          /> */}
+          />
 
           {/* Top Info Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 mb-6 sm:mb-8">
@@ -197,7 +197,6 @@ const canAcceptReject = shipment &&
           {/* Rest of your existing content... */}
           {/* Divider */}
           <div className="border-t border-orange-100 my-4 sm:my-6" />
-          
           {/* Package Section */}
           <div className="bg-orange-50 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 overflow-x-auto">
             <PackageIcon size={22} className="text-orange-400 flex-shrink-0" />
@@ -279,65 +278,63 @@ const canAcceptReject = shipment &&
 
           {/* Actions - Only show if not in final states */}
           {shipment && !["REJECTED", "DELIVERED", "CANCELLED"].includes(shipment.status_type) && (
-  <div className="flex gap-4 mt-8 items-center justify-end">
-    {canEdit && (
-      <button 
-        onClick={() => setEditAllMode(true)} 
-        className="bg-gray-200 text-gray-700 px-4 py-2 rounded shadow hover:bg-gray-300 flex items-center gap-2" 
-        aria-label="Edit shipment"
-      >
-        <Edit2 size={18} /> Edit
-      </button>
-    )}
-    {canCancel && (
-      <button 
-        onClick={() => setShowCancelConfirm(true)} 
-        className="p-2 hover:bg-orange-100 rounded-full" 
-        aria-label="Cancel shipment"
-      >
-        <X size={22} className="text-orange-500" />
-      </button>
-    )}
-    {canAcceptReject && (
-      <>
-        <button
-          onClick={handleAcceptShipment}
-          disabled={acceptingShipment}
-          className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 flex items-center gap-2 ${
-            acceptingShipment
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40'
-          }`}
-          aria-label="Accept shipment"
-        >
-          {acceptingShipment ? (
-            <div className="animate-spin rounded-full h-4 w-4 border-b border-white"></div>
-          ) : (
-            <Check size={18} />
+            <div className="flex gap-4 mt-8 items-center justify-end">
+              {canEdit && (
+                <button
+                  onClick={() => setEditAllMode(true)}
+                  className="bg-gray-200 text-gray-700 px-4 py-2 rounded shadow hover:bg-gray-300 flex items-center gap-2"
+                  aria-label="Edit shipment"
+                >
+                  <Edit2 size={18} /> Edit
+                </button>
+              )}
+              {canCancel && (
+                <button
+                  onClick={() => setShowCancelConfirm(true)}
+                  className="p-2 hover:bg-orange-100 rounded-full"
+                  aria-label="Cancel shipment"
+                >
+                  <X size={22} className="text-orange-500" />
+                </button>
+              )}
+              {canAcceptReject && (
+                <>
+                  <button
+                    onClick={handleAcceptShipment}
+                    disabled={acceptingShipment}
+                    className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 flex items-center gap-2 ${acceptingShipment
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40'
+                      }`}
+                    aria-label="Accept shipment"
+                  >
+                    {acceptingShipment ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b border-white"></div>
+                    ) : (
+                      <Check size={18} />
+                    )}
+                    Accept Shipment
+                  </button>
+                  <button
+                    onClick={handleRejectShipment}
+                    disabled={rejectingShipment}
+                    className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 flex items-center gap-2 ${rejectingShipment
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/40'
+                      }`}
+                    aria-label="Reject shipment"
+                  >
+                    {rejectingShipment ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b border-white"></div>
+                    ) : (
+                      <XCircle size={18} />
+                    )}
+                    Reject Shipment
+                  </button>
+                </>
+              )}
+            </div>
           )}
-          Accept Shipment
-        </button>
-        <button
-          onClick={handleRejectShipment}
-          disabled={rejectingShipment}
-          className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 flex items-center gap-2 ${
-            rejectingShipment
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/40'
-          }`}
-          aria-label="Reject shipment"
-        >
-          {rejectingShipment ? (
-            <div className="animate-spin rounded-full h-4 w-4 border-b border-white"></div>
-          ) : (
-            <XCircle size={18} />
-          )}
-          Reject Shipment
-        </button>
-      </>
-    )}
-  </div>
-)}
         </div>
 
         {/* Cancel Modal */}

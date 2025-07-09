@@ -1,37 +1,71 @@
 // src/services/shipmentService.js
+
 import axiosInstance from '../utils/axiosInstance';
-// Get all shipments
-export const getAllShipments = (params = {}) => {
-  return axiosInstance.get('/shipment/v1/shipments/', { params });
-};
 
-export const getShipmentById = (id) => {
-  return axiosInstance.get(`/shipment/v1/shipments/${id}`);
-};
-
-// Create a new shipment
-export const createShipment = (data) => {
-  return axiosInstance.post('/shipment/v1/shipments/', data);
+export const getAllShipments = async () => {
+  try {
+    const response = await axiosInstance.get('/shipment/v1/shipments/');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching shipments:', error);
+    throw error;
+  }
 };
 
 
-// Update a shipment by ID
-export const updateShipment = (id, data) => axiosInstance.put(`/shipment/v1/shipments/${id}`, data);
+export const getShipmentById = async (id) => {
+  return await axiosInstance.get(`/shipment/v1/shipments/${id}`);
+};
 
-// Update only the status of a shipment by ID
-export const updateShipmentStatus = (id, data) => axiosInstance.put(`/shipment/v1/shipments/${id}/status/`, data);
+export const createShipment = async (data) => {
+  return await axiosInstance.post('/shipment/v1/create_shipment/', data);
+};
 
-// Update the tracker/status of a shipment by ID
-export const updateShipmentTrackerStatus = (id, data) => axiosInstance.post(`/shipment/v1/shipments/${id}/tracker/`, data);
+export const updateShipment = async (id, data) => {
+  return await axiosInstance.patch(`/shipment/v1/update_shipment/${id}`, data);
+};
 
-// Delete a shipment by ID
-export const deleteShipment = (id) => axiosInstance.delete(`/shipments/${id}`);
+export const updateShipmentTrackerStatus = async (id, data) => {
+  return await axiosInstance.post(`/shipment/v1/shipments/${id}/accept_reject/`, data);
+};
 
-// Accept a shipment by ID
-export const acceptShipment = (id) => axiosInstance.post(`/shipment/v1/shipments/${id}/accept/`);
+export const updateShipmentStatus = async (shipmentId, payload) => {
+  return await axiosInstance.patch(`/shipment/v1/update_shipment/${shipmentId}`, payload);
+};
 
-// Reject a shipment by ID
-export const rejectShipment = (id) => axiosInstance.post(`/shipment/v1/shipments/${id}/reject/`);
+export const acceptShipment = async (shipmentId) => {
+  try {
+    console.log('Sending accept request for shipment:', shipmentId);
+    const response = await axiosInstance.post(`/shipment/v1/shipments/${shipmentId}/accept_reject/`, {
+      action: "accept"
+    });
+    console.log('Accept response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error accepting shipment:', error);
+    console.error('Error response:', error.response?.data);
+    console.error('Error status:', error.response?.status);
+    throw error;
+  }
+};
 
-// Cancel a shipment by ID
-export const cancelShipment = (id) => axiosInstance.post(`/shipment/v1/shipments/${id}/cancel/`);
+export const rejectShipment = async (shipmentId) => {
+  try {
+    console.log('Sending reject request for shipment:', shipmentId);
+    const response = await axiosInstance.post(`/shipment/v1/shipments/${shipmentId}/accept_reject/`, {
+      action: "reject"
+    });
+    console.log('Reject response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error rejecting shipment:', error);
+    console.error('Error response:', error.response?.data);
+    console.error('Error status:', error.response?.status);
+    throw error;
+  }
+};
+
+export const cancelShipment = async (shipmentId) => {
+  return await axiosInstance.post(`/shipment/v1/cancel_shipment/${shipmentId}`);
+};
+
