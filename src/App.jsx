@@ -12,6 +12,9 @@ import CreateShipment from './pages/panels/shipments/CreateShipment';
 import ViewShipment from './pages/panels/shipments/ViewShipment';
 import EditShipment from './pages/panels/shipments/EditShipment';
 import Address from './pages/panels/Address/address';
+import Terms from './pages/Terms';         // Add this import
+import Privacy from './pages/Privacy';  
+import 'react-toastify/dist/ReactToastify.css';
 
 
 // Import your Settings component here:
@@ -27,6 +30,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
 
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
         {/* Protected Routes */}
         <Route
           path="/dashboard"
