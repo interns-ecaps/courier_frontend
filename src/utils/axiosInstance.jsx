@@ -22,10 +22,12 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && [401, 403].includes(error.response.status)) {
+    // Only auto-logout for authentication errors, not permission errors
+    if (error.response?.status === 401) {
       sessionStorage.clear();
       window.location.href = '/login';
     }
+    // For 403 (Forbidden), let the component handle it gracefully
     return Promise.reject(error);
   }
 );
