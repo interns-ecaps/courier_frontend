@@ -15,6 +15,8 @@ import Address from './pages/panels/Address/address';
 import Terms from './pages/Terms';         // Add this import
 import Privacy from './pages/Privacy';  
 import 'react-toastify/dist/ReactToastify.css';
+import ForgotPassword from './pages/Auth/ForgotPassword';
+import ResetPassword from './pages/Auth/ResetPassword';
 
 
 // Import your Settings component here:
@@ -29,6 +31,8 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
