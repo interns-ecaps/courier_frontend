@@ -8,3 +8,15 @@ export const getMyPackages = () => {
     params: { user_id: user.id },
   });
 };
+
+export const createPackage = async (data) => {
+  return await api.post('/shipment/v1/create_package/', data);
+};
+
+export const getPackageById = async (id) => {
+  return await api.get(`/shipment/v1/packages/${id}`);
+};
+
+export const updatePackage = async (id, data) => {
+  return await api.patch(`/shipment/v1/packages/${id}`, data);
+};

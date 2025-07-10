@@ -12,6 +12,7 @@ const shipmentFields = [
     { key: "recipient_name", label: "Recipient" },
     { key: "supplier_name", label: "Supplier" },
     { key: "status_type", label: "Status" },
+    { key: "price", label: "Price" }, // <-- Add Price column here
     { key: "pickup_date", label: "Pickup Date" },
     { key: "estimated_delivery", label: "ETA" },
     { key: "tracking_number", label: "Tracking #" },
@@ -24,7 +25,21 @@ export default function Shipment() {
     const [creatingShipment, setCreatingShipment] = useState(false);
     const [viewingShipment, setViewingShipment] = useState(null);
     const [editingShipment, setEditingShipment] = useState(null);
-    const [activeTab, setActiveTab] = useState("open");
+    // === Tabs UI with All Shipments and status tabs ===
+    const [activeTab, setActiveTab] = useState("all");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [supplierFilter, setSupplierFilter] = useState("");
+
+    const tabs = [
+        { key: "all", label: "All Shipments" },
+        { key: "pending", label: "Pending" },
+        { key: "in_transit", label: "In Transit" },
+        { key: "accepted", label: "Accepted" },
+        { key: "delivered", label: "Delivered" },
+        { key: "rejected", label: "Rejected" },
+        { key: "cancelled", label: "Cancelled" },
+    ];
+
     const [cancellingShipmentId, setCancellingShipmentId] = useState(null);
     const [showCancelConfirm, setShowCancelConfirm] = useState(false);
     const [shipmentToCancel, setShipmentToCancel] = useState(null);
@@ -40,68 +55,41 @@ export default function Shipment() {
         }
     }, []);
 
+    const [currentPage, setCurrentPage] = useState(1);
+    const rowsPerPage = 10;
+    const [totalRows, setTotalRows] = useState(0);
+    const [backendShipments, setBackendShipments] = useState([]);
+
+    // Fetch shipments with backend pagination
     useEffect(() => {
-        const fetchShipments = async () => {
-            if (!user) return;
+      const fetchShipments = async () => {
+        if (!user) return;
+        setLoading(true);
+        try {
+          let filters = {};
+          if (user.user_type === "supplier") {
+            filters = {};
+          } else if (user.user_type === "courier") {
+            filters = { courier_id: user.id };
+          } else if (user.user_type === "super_admin") {
+            filters = {};
+          } else {
+            filters = { sender_id: user.id };
+          }
+          const response = await getAllShipments({ ...filters, page: currentPage, limit: rowsPerPage });
+          setBackendShipments(response.results || []);
+          setTotalRows(response.total || 0);
+        } catch (error) {
+          console.error("Failed to fetch shipments", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchShipments();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, currentPage]);
 
-            try {
-                let response;
-
-                let filters = {};
-
-                if (user.user_type === "supplier") {
-                    filters = {}; // suppliers see all
-                } else if (user.user_type === "courier") {
-                    filters = { courier_id: user.id }; // filter by assigned courier
-                } else if (user.user_type === "super_admin") {
-                    filters = {}; // super admins see everything
-                } else {
-                    filters = {
-                        sender_id: user.id,
-                    }; // importer/exporter
-                }
-
-response = await getAllShipments(filters);
-
-                console.log("Raw response:", response);
-                console.log("Response structure:", {
-                    hasData: !!response?.data,
-                    hasResults: !!response?.data?.results,
-                    isArray: Array.isArray(response?.data?.results),
-                    directArray: Array.isArray(response?.data),
-                    responseKeys: Object.keys(response || {}),
-                    dataKeys: Object.keys(response?.data || {})
-                });
-
-                // Try different possible response structures
-                let shipmentResults = [];
-
-                if (response?.results && Array.isArray(response.results)) {
-                    shipmentResults = response.results;
-                } else if (response?.data?.results && Array.isArray(response.data.results)) {
-                    shipmentResults = response.data.results;
-                } else if (Array.isArray(response?.data)) {
-                    shipmentResults = response.data;
-                } else if (Array.isArray(response)) {
-                    shipmentResults = response;
-                } else {
-                    console.warn("Unexpected response structure:", response);
-                }
-
-                console.log("Parsed shipments:", shipmentResults);
-                console.log("First shipment sample:", shipmentResults[0]);
-
-                setShipments(shipmentResults);
-
-            } catch (error) {
-                console.error("Failed to fetch shipments", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchShipments();
-    }, [user]);
+    const totalPages = Math.ceil(totalRows / rowsPerPage);
 
     const handleStatusUpdate = async (shipmentId, newStatus) => {
         try {
@@ -197,64 +185,25 @@ response = await getAllShipments(filters);
     console.log("Total shipments:", shipments.length);
     console.log("Shipments data:", shipments);
 
-    // Tabs configuration
-    const baseTabs = [
-        { key: "open", label: "Open" },
-        { key: "accepted", label: "Accepted" },
-        { key: "rejected", label: "Rejected" },
-    ];
-    const tabCounts = {
-        open: shipments.filter(s => ["pending", "in_transit"].includes(s.status_type?.toLowerCase())).length,
-        accepted: shipments.filter(s => ["accepted", "delivered"].includes(s.status_type?.toLowerCase())).length,
-        rejected: shipments.filter(s => ["rejected"].includes(s.status_type?.toLowerCase())).length,
-        cancelled: shipments.filter(s => ["cancelled"].includes(s.status_type?.toLowerCase())).length,
-    };
-    const tabsConfig = user?.user_type === "importer_exporter"
-        ? [...baseTabs, { key: "cancelled", label: "Cancelled" }]
-        : baseTabs;
-
-    const filteredShipments = shipments.filter((shipment) => {
-        const status = shipment.status_type?.toLowerCase();
-        if (user?.user_type === "supplier") {
-            if (activeTab === "open") return status === "pending";
-            if (activeTab === "accepted") return ["accepted", "delivered"].includes(status);
-            if (activeTab === "rejected") return ["rejected", "cancelled"].includes(status);
+    // Filtering logic
+    const filteredShipments = backendShipments.filter((shipment) => {
+        if (activeTab !== "all") {
+            return shipment.status_type?.toLowerCase() === activeTab;
         }
-        if (activeTab === "open") return ["pending", "in_transit"].includes(status);
-        if (activeTab === "accepted") return ["accepted", "delivered"].includes(status);
-        if (activeTab === "rejected") return ["rejected"].includes(status);
-        if (user?.user_type === "importer_exporter" && activeTab === "cancelled") return status === "cancelled";
         return true;
     });
     console.log("Filtered Shipments rendering:", filteredShipments);
 
-    const Tabs = () => (
-        <div className="flex gap-2 mb-8">
-            {tabsConfig.map(({ key, label }) => (
-                <button
-                    key={key}
-                    onClick={() => setActiveTab(key)}
-                    className={`relative px-6 py-3 rounded-2xl font-medium transition-all duration-300 hover:scale-105 ${activeTab === key ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-700'}`}
-                >
-                    {label}
-                    {tabCounts[key] > 0 && (
-                        <span className="ml-2 bg-white text-orange-500 rounded-full px-2 py-0.5 text-xs font-bold">{tabCounts[key]}</span>
-                    )}
-                </button>
-            ))}
-        </div>
-    );
-
     const statusBadge = (status) => {
         const s = status?.toLowerCase();
-        let classes = "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold";
+        let classes = "inline-flex items-center px-4 py-1 rounded-full text-sm font-bold shadow-sm border-2 mr-1";
         
-        if (s === "pending") classes += " bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 border border-yellow-300";
-        else if (s === "in_transit") classes += " bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 border border-blue-300";
-        else if (s === "accepted" || s === "delivered") classes += " bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300";
-        else if (s === "rejected") classes += " bg-gradient-to-r from-red-100 to-red-200 text-red-800 border border-red-300";
-        else if (s === "cancelled") classes += " bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 border border-gray-300";
-        else classes += " bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 border border-gray-300";
+        if (s === "pending") classes += " bg-yellow-100 text-yellow-800 border-yellow-300";
+        else if (s === "in_transit") classes += " bg-blue-100 text-blue-800 border-blue-300";
+        else if (s === "accepted" || s === "delivered") classes += " bg-green-100 text-green-800 border-green-300";
+        else if (s === "rejected") classes += " bg-red-100 text-red-800 border-red-400";
+        else if (s === "cancelled") classes += " bg-gray-200 text-gray-700 border-gray-400";
+        else classes += " bg-gray-100 text-gray-700 border-gray-300";
 
         return (
             <span className={classes}>
@@ -275,253 +224,144 @@ response = await getAllShipments(filters);
     };
 
     const ShipmentsListing = () => (
-        <div className="min-h-screen p-8" style={{ background: '#fff7f0' }}>
-            <div className="max-w-7xl mx-auto">
-                {/* Header */}
-                <div className="mb-8">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                                Shipments Management
-                            </h1>
-                            <p className="text-gray-600 mt-2">Track and manage all your shipments in one place</p>
-                        </div>
-                        {(user?.user_type === "importer_exporter" || user?.user_type === "super_admin") && (
+        <div className="flex-1 min-h-0 flex flex-col bg-[#fff7f0] w-full h-full p-2 sm:p-4 md:p-6">
+            <div className="w-full flex flex-col items-start justify-start mb-4">
+                <h1 className="text-4xl font-extrabold text-gray-800 mb-2 ml-2 drop-shadow-sm">Shipments</h1>
+            </div>
+            <div className="flex-1 flex flex-col items-center justify-start min-h-0 w-full h-full">
+                <div className="w-full flex-1 flex flex-col bg-white rounded-3xl shadow-2xl border border-orange-100 p-0 h-full">
+                    {/* Create Shipment Button (top right) */}
+                    {(user?.user_type === "importer_exporter" || user?.user_type === "super_admin") && (
+                        <div className="flex justify-end p-2 sm:p-4 md:p-6 pb-0">
                             <button
                                 onClick={handleCreate}
-                                className="bg-orange-500 text-white px-4 py-2 rounded shadow hover:bg-orange-600"
+                                className="bg-orange-500 text-white px-6 py-3 rounded-xl shadow-lg hover:bg-orange-600 active:bg-orange-700 transition-all text-lg font-semibold"
                             >
                                 Create Shipment
                             </button>
-                        )}
+                        </div>
+                    )}
+                    {/* Tabs UI */}
+                    <div className="flex gap-3 mb-6 px-4 pt-4 flex-wrap">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.key}
+                                onClick={() => setActiveTab(tab.key)}
+                                className={`relative px-6 py-3 rounded-2xl font-semibold text-base transition-all duration-300 shadow-sm border-2 ${activeTab === tab.key ? 'bg-orange-500 text-white border-orange-500 scale-105' : 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200 hover:scale-105'}`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
                     </div>
-                </div>
-
-                <Tabs />
-
-                {/* Table Container */}
-                <div className="bg-white rounded-2xl shadow-lg p-6 border border-orange-100">
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-                                <tr>
-                                    {shipmentFields.map((field) => (
-                                        <th key={field.key} className="py-4 px-6 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                                            {field.label}
-                                        </th>
-                                    ))}
-                                    <th className="py-4 px-6 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-
-                            <tbody className="divide-y divide-gray-100">
-                                {loading && (
-                                    <tr>
-                                        <td colSpan={shipmentFields.length + 1} className="py-12 text-center">
-                                            <div className="flex flex-col items-center gap-4">
-                                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                                                <span className="text-gray-500 font-medium">Loading shipments...</span>
-                                            </div>
-                                        </td>
+                    {/* Table Container with horizontal scroll on small screens */}
+                    <div className="flex-1 flex flex-col min-h-0 w-full h-full overflow-x-auto">
+                        <div className="w-full min-w-[900px] md:min-w-0 h-full px-0 pb-0">
+                            <table className="w-full h-full table-fixed text-sm">
+                                <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 h-14">
+                                    <tr className="h-14">
+                                        {/* Conditionally render Sender column */}
+                                        {['super_admin', 'supplier'].includes(user?.user_type) && (
+                                            <th className="truncate px-4 py-3 text-base font-bold">Sender</th>
+                                        )}
+                                        <th className="truncate px-4 py-3 text-base font-bold">Recipient</th>
+                                        <th className="truncate px-4 py-3 text-base font-bold">Supplier</th>
+                                        <th className="truncate px-4 py-3 text-base font-bold">Status</th>
+                                        <th className="truncate px-4 py-3 text-base font-bold">Price</th>
+                                        <th className="truncate px-4 py-3 text-base font-bold">Pickup</th>
+                                        <th className="truncate px-4 py-3 text-base font-bold">ETA</th>
+                                        <th className="truncate px-4 py-3 text-base font-bold">Tracking #</th>
+                                        <th className="truncate px-4 py-3 text-base font-bold">Actions</th>
                                     </tr>
-                                )}
-                                {!loading && filteredShipments.length === 0 && (
-                                    <tr>
-                                        <td colSpan={shipmentFields.length + 1} className="py-16 text-center">
-                                            <div className="flex flex-col items-center gap-4">
-                                                <div className="text-6xl opacity-50">📦</div>
-                                                <div className="text-gray-500">
-                                                    <p className="text-lg font-medium">No shipments found</p>
-                                                    <p className="text-sm">No shipments match your current filter criteria.</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
-                                {!loading && filteredShipments.map((shipment, index) => {
-                                    const showDecisionButtons =
-                                        user?.user_type === "supplier" &&
-                                        activeTab === "open" &&
-                                        shipment.status_type?.toLowerCase() === "pending";
-
-                                    return (
-                                        <tr key={shipment.id} className="hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-purple-50/50 transition-all duration-300 group">
-                                            {shipmentFields.map((field) => {
-                                                let value = shipment[field.key];
-
-                                                // Format status_type (capitalize first letter)
-                                                if (field.key === "status_type" && typeof value === "string") {
-                                                    value = statusBadge(value);
-                                                }
-
-                                                // Format dates
-                                                if (["pickup_date", "estimated_delivery"].includes(field.key)) {
-                                                    value = value ? new Date(value).toLocaleDateString() : (
-                                                        <span className="text-gray-400 italic">Not set</span>
-                                                    );
-                                                }
-
-                                                // Copy tracking number
-                                                if (field.key === "tracking_number" && value) {
-                                                    value = (
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded-lg">{value}</span>
-                                                            <button
-                                                                aria-label="Copy tracking number"
-                                                                onClick={() => copyToClipboard(value)}
-                                                                className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
-                                                            >
-                                                                <Copy className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                }
-
-                                                return (
-                                                    <td key={field.key} className="py-4 px-6 text-sm text-gray-700">
-                                                        {value ?? <span className="text-gray-400 italic">N/A</span>}
-                                                    </td>
-                                                );
-                                            })}
-                                            <td className="py-4 px-6">
-                                                <div className="flex items-center justify-center gap-2">
-                                                    <button
-                                                        title="View Details"
-                                                        aria-label={`View shipment ${shipment.id}`}
-                                                        onClick={() => handleView(shipment.id)}
-                                                        className="p-2 hover:bg-gray-100 rounded-full text-gray-600"
-                                                    >
-                                                        <Eye size={18} />
-                                                    </button>
-                                                    {user?.user_type !== "supplier" && !["cancelled", "delivered", "accepted"].includes(shipment.status_type?.toLowerCase()) && (
-                                                        <button
-                                                            title="Edit Shipment"
-                                                            aria-label={`Edit shipment ${shipment.id}`}
-                                                            onClick={() => handleEdit(shipment)}
-                                                            className="p-2 hover:bg-gray-100 rounded-full text-gray-600"
-                                                        >
-                                                            <Edit2 size={18} />
-                                                        </button>
-                                                    )}
-                                                    {/* Cancel button for importer_exporter if status is pending, in_transit, or accepted */}
-                                                    {user?.user_type === "importer_exporter" && ["pending", "in_transit", "accepted"].includes(shipment.status_type?.toLowerCase()) && (
-                                                        <button
-                                                            onClick={() => handleCancelClick(shipment)}
-                                                            className="p-2 hover:bg-orange-100 rounded-full"
-                                                            aria-label="Cancel"
-                                                        >
-                                                            <X size={20} className="text-orange-500" />
-                                                        </button>
-                                                    )}
-                                                    {showDecisionButtons && (
-                                                        <div className="flex gap-2">
-                                                            <button
-                                                                onClick={() => handleAcceptShipment(shipment.id)}
-                                                                disabled={acceptingShipmentId === shipment.id}
-                                                                className={`px-3 py-1.5 text-sm rounded-lg transition-all duration-200 transform hover:scale-105 font-medium flex items-center gap-1.5 ${
-                                                                    acceptingShipmentId === shipment.id
-                                                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                                                        : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40'
-                                                                }`}
-                                                                aria-label="Accept shipment"
-                                                            >
-                                                                {acceptingShipmentId === shipment.id ? (
-                                                                    <div className="animate-spin rounded-full h-3 w-3 border-b border-white"></div>
-                                                                ) : (
-                                                                    <Check size={14} />
-                                                                )}
-                                                                Accept
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleRejectShipment(shipment.id)}
-                                                                disabled={rejectingShipmentId === shipment.id}
-                                                                className={`px-3 py-1.5 text-sm rounded-lg transition-all duration-200 transform hover:scale-105 font-medium flex items-center gap-1.5 ${
-                                                                    rejectingShipmentId === shipment.id
-                                                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                                                        : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/40'
-                                                                }`}
-                                                                aria-label="Reject shipment"
-                                                            >
-                                                                {rejectingShipmentId === shipment.id ? (
-                                                                    <div className="animate-spin rounded-full h-3 w-3 border-b border-white"></div>
-                                                                ) : (
-                                                                    <XCircle size={14} />
-                                                                )}
-                                                                Reject
-                                                            </button>
-                                                        </div>
-                                                    )}
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {loading && (
+                                        <tr className="h-12">
+                                            <td colSpan={9} className="py-12 text-center">
+                                                <div className="flex flex-col items-center gap-4">
+                                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                                                    <span className="text-gray-500 font-medium">Loading shipments...</span>
                                                 </div>
                                             </td>
                                         </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            {/* Cancel Confirmation Modal */}
-            {showCancelConfirm && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50 p-4">
-                    <div className="bg-white/95 backdrop-blur-xl p-8 rounded-3xl shadow-2xl max-w-md w-full border border-white/20">
-                        <div className="text-center">
-                            <div className="text-red-500 text-5xl mb-4">⚠️</div>
-                            <h3 className="text-xl font-bold text-gray-900 mb-2">Cancel Shipment</h3>
-                            <p className="text-gray-600 mb-6">
-                                Are you sure you want to cancel shipment{" "}
-                                <span className="font-mono font-semibold text-gray-900">#{shipmentToCancel?.tracking_number}</span>?
-                            </p>
-                            <div className="flex gap-3 justify-center">
+                                    )}
+                                    {!loading && filteredShipments.length === 0 && (
+                                        <tr className="h-12">
+                                            <td colSpan={9} className="py-16 text-center">
+                                                <div className="flex flex-col items-center gap-4">
+                                                    <div className="text-6xl opacity-50">📦</div>
+                                                    <div className="text-gray-500">
+                                                        <p className="text-lg font-medium">No shipments found</p>
+                                                        <p className="text-sm">No shipments match your current filter criteria.</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {!loading && filteredShipments.map((shipment) => (
+                                        <tr key={shipment.id} className="text-sm h-14 hover:bg-orange-50 transition-all">
+                                            {/* Conditionally render Sender column */}
+                                            {['super_admin', 'supplier'].includes(user?.user_type) && (
+                                                <td className="truncate px-4 py-3" title={shipment.sender_name}>{shipment.sender_name}</td>
+                                            )}
+                                            <td className="truncate px-4 py-3" title={shipment.recipient_name}>{shipment.recipient_name}</td>
+                                            <td className="truncate px-4 py-3" title={shipment.supplier_name}>{shipment.supplier_name}</td>
+                                            <td className="truncate px-4 py-3">{statusBadge(shipment.status_type)}</td>
+                                            <td className="truncate px-4 py-3">{shipment.package && shipment.package.final_cost != null ? `${shipment.package.final_cost} ${shipment.package.currency || ''}` : <span className="text-gray-400 italic">N/A</span>}</td>
+                                            <td className="truncate px-4 py-3">{shipment.pickup_date ? new Date(shipment.pickup_date).toLocaleDateString() : <span className="text-gray-400 italic">N/A</span>}</td>
+                                            <td className="truncate px-4 py-3">{shipment.estimated_delivery ? new Date(shipment.estimated_delivery).toLocaleDateString() : <span className="text-gray-400 italic">N/A</span>}</td>
+                                            <td className="truncate px-4 py-3 font-mono" title={shipment.tracking_number}>
+                                                <span className="block max-w-[120px] truncate cursor-pointer" title={shipment.tracking_number}>{shipment.tracking_number}</span>
+                                            </td>
+                                            <td className="truncate px-4 py-3 text-center">
+                                                <button
+                                                    title="View Details"
+                                                    aria-label={`View shipment ${shipment.id}`}
+                                                    onClick={() => handleView(shipment.id)}
+                                                    className="p-1 hover:bg-gray-100 rounded-full text-gray-600"
+                                                >
+                                                    <Eye size={16} />
+                                                </button>
+                                                {user?.user_type !== "supplier" && !["cancelled", "delivered", "accepted"].includes(shipment.status_type?.toLowerCase()) && (
+                                                    <button
+                                                        title="Edit Shipment"
+                                                        aria-label={`Edit shipment ${shipment.id}`}
+                                                        onClick={() => handleEdit(shipment)}
+                                                        className="p-1 hover:bg-gray-100 rounded-full text-green-600"
+                                                    >
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {/* Pagination Controls (not sticky, just below table) */}
+                        {totalPages > 1 && (
+                            <div className="w-full bg-white border-t border-orange-100 px-0 py-2 sm:py-4 z-10 flex justify-center items-center gap-2 sm:gap-4 flex-wrap">
                                 <button
-                                    onClick={() => setShowCancelConfirm(false)}
-                                    className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-medium transition-all duration-200 transform hover:scale-105"
+                                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-3 sm:px-4 py-2 rounded bg-gray-200 text-gray-700 font-semibold disabled:opacity-50"
                                 >
-                                    Keep Shipment
+                                    Previous
                                 </button>
+                                <span className="font-medium">Page {currentPage} of {totalPages}</span>
                                 <button
-                                    onClick={confirmCancel}
-                                    className="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-2xl font-medium shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/40 transition-all duration-200 transform hover:scale-105"
+                                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className="px-3 sm:px-4 py-2 rounded bg-gray-200 text-gray-700 font-semibold disabled:opacity-50"
                                 >
-                                    Yes, Cancel
+                                    Next
                                 </button>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
-            )}
+            </div>
         </div>
     );
-
-    // Super Admin View: show all shipments in a simple table
-    if (user?.user_type === 'super_admin') {
-        return (
-            <div className="p-8">
-                <h1 className="text-3xl font-bold mb-6">All Shipments (Super Admin View)</h1>
-                <table className="min-w-full border text-sm text-left">
-                    <thead className="bg-gray-100">
-                        <tr>
-                            {shipmentFields.map((field) => (
-                                <th key={field.key} className="border px-4 py-2">{field.label}</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {shipments.map((shipment) => (
-                            <tr key={shipment.id}>
-                                {shipmentFields.map((field) => (
-                                    <td key={field.key} className="border px-4 py-2">{String(shipment[field.key] ?? '')}</td>
-                                ))}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        );
-    }
 
     return (
         <>

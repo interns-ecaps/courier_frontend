@@ -46,7 +46,7 @@ export default function Navbar() {
         setShowDropdown(false);
     };
     return <><header className="flex z-10 relative justify-between items-center mb-8 bg-white bg-opacity-90 backdrop-blur-md p-6 rounded-2xl border border-orange-200 shadow-lg">
-        <h1 className="text-3xl font-bold text-gray-800">
+        <h1 className="text-3xl ml-15 md:ml-0 font-bold text-gray-800">
             {pathname.split("/")[1].charAt(0).toUpperCase() + pathname.split("/")[1].slice(1)}
         </h1>
 

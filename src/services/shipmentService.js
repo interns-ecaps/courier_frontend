@@ -2,9 +2,12 @@
 
 import axiosInstance from '../utils/axiosInstance';
 
-export const getAllShipments = async () => {
+export const getAllShipments = async (params = {}) => {
+  const { page = 1, limit = 10, ...filters } = params;
   try {
-    const response = await axiosInstance.get('/shipment/v1/shipments/');
+    const response = await axiosInstance.get('/shipment/v1/shipments/', {
+      params: { ...filters, page, limit },
+    });
     return response.data;
   } catch (error) {
     console.error('Error fetching shipments:', error);
@@ -64,5 +67,10 @@ export const rejectShipment = async (shipmentId) => {
 
 export const cancelShipment = async (shipmentId) => {
   return await axiosInstance.post(`/shipment/v1/cancel_shipment/${shipmentId}`);
+};
+
+export const getAllCurrencies = async () => {
+  const response = await axiosInstance.get('/shipment/v1/currencies/');
+  return response.data.results || [];
 };
 

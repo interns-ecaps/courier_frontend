@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ShipmentForm from '../../../components/shipments/ShipmentForm';
 import { getShipmentById, updateShipment } from '../../../services/shipmentService';
+import { getPackageById } from '../../../services/packageService';
 import { toast } from 'react-toastify';
 
 const EditShipment = () => {
@@ -24,7 +25,28 @@ const EditShipment = () => {
     (async () => {
       try {
         const res = await getShipmentById(id);
-        setShipmentData(res.data);
+        const shipment = res.data;
+        console.log('Fetched shipment for edit:', shipment);
+        let packageData = {};
+        if (shipment.package) {
+          packageData = {
+            package_type: shipment.package.type,
+            weight: shipment.package.weight,
+            length: shipment.package.length,
+            width: shipment.package.width,
+            height: shipment.package.height,
+            is_negotiable: shipment.package.is_negotiable,
+            currency_id: shipment.package.currency_id, // FIXED: use currency_id
+            final_cost: shipment.package.final_cost,
+            package_id: shipment.package.id, // ADD THIS LINE
+          };
+        }
+        // Ensure delivery_address_text is always present for the form
+        let deliveryData = {};
+        if (!('delivery_address_text' in shipment)) {
+          deliveryData.delivery_address_text = '';
+        }
+        setShipmentData({ ...shipment, ...packageData, ...deliveryData });
       } catch (error) {
         console.error(error);
         toast.error('Failed to load shipment');

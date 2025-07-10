@@ -130,18 +130,22 @@ const ShipmentList = () => {
         <table className="min-w-full border text-sm text-left">
           <thead className="bg-gray-100">
             <tr>
-              <th className="border px-4 py-2">ID</th>
-              <th className="border px-4 py-2">Sender</th>
-              <th className="border px-4 py-2">Receiver</th>
-              <th className="border px-4 py-2">Role</th>
-              <th className="border px-4 py-2">Status</th>
-              <th className="border px-4 py-2">Actions</th>
+              <th className="border px-2 py-2 w-10">ID</th>
+              <th className="border px-2 py-2 w-32 truncate">Sender</th>
+              <th className="border px-2 py-2 w-32 truncate">Receiver</th>
+              <th className="border px-2 py-2 w-16">Role</th>
+              <th className="border px-2 py-2 w-20">Status</th>
+              <th className="border px-2 py-2 w-24">Price</th>
+              <th className="border px-2 py-2 w-32">Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredShipments.map((shipment) => {
               const isSender = shipment.sender_id === userId;
               const isEditable = isSender && !['DELIVERED', 'CANCELLED', 'REJECTED'].includes((shipment.status_type || shipment.status)?.toUpperCase());
+              // Get price and currency from package if available
+              const price = shipment.package?.final_cost ?? '-';
+              const currency = shipment.package?.currency ?? '';
               return (
                 <tr
                   key={shipment.id}
@@ -149,12 +153,13 @@ const ShipmentList = () => {
                     isSender ? 'bg-green-50' : ''
                   }`}
                 >
-                  <td className="border px-4 py-2">{shipment.id}</td>
-                  <td className="border px-4 py-2">{shipment.sender_name || 'N/A'}</td>
-                  <td className="border px-4 py-2">{shipment.recipient_name || 'N/A'}</td>
-                  <td className="border px-4 py-2"></td>
-                  <td className="border px-4 py-2">{shipment.status || 'Pending'}</td>
-                  <td className="border px-4 py-2">
+                  <td className="border px-2 py-2 w-10">{shipment.id}</td>
+                  <td className="border px-2 py-2 w-32 truncate" title={shipment.sender_name}>{shipment.sender_name || 'N/A'}</td>
+                  <td className="border px-2 py-2 w-32 truncate" title={shipment.recipient_name}>{shipment.recipient_name || 'N/A'}</td>
+                  <td className="border px-2 py-2 w-16"></td>
+                  <td className="border px-2 py-2 w-20">{shipment.status || 'Pending'}</td>
+                  <td className="border px-2 py-2 w-24">{price} {currency}</td>
+                  <td className="border px-2 py-2 w-32">
                     <button
                       onClick={() => handleViewShipment(shipment.id)}
                       className="text-blue-500 hover:underline mr-2"
