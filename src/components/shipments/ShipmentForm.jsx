@@ -294,6 +294,7 @@ const ShipmentForm = ({
         toast.error('Failed to create shipment');
       }
     }
+    setSubmitting(false);
   };
 
   const disabled = readOnly;

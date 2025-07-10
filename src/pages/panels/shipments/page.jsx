@@ -207,13 +207,12 @@ export default function Shipment() {
 
         return (
             <span className={classes}>
-                <div className={`w-2 h-2 rounded-full mr-2 ${
-                    s === "pending" ? "bg-yellow-500" :
-                    s === "in_transit" ? "bg-blue-500" :
-                    (s === "accepted" || s === "delivered") ? "bg-green-500" :
-                    s === "rejected" ? "bg-red-500" :
-                    s === "cancelled" ? "bg-gray-500" : "bg-gray-400"
-                }`}></div>
+                <div className={`w-2 h-2 rounded-full mr-2 ${s === "pending" ? "bg-yellow-500" :
+                        s === "in_transit" ? "bg-blue-500" :
+                            (s === "accepted" || s === "delivered") ? "bg-green-500" :
+                                s === "rejected" ? "bg-red-500" :
+                                    s === "cancelled" ? "bg-gray-500" : "bg-gray-400"
+                    }`}></div>
                 {status?.charAt(0).toUpperCase() + status?.slice(1).toLowerCase()}
             </span>
         );
