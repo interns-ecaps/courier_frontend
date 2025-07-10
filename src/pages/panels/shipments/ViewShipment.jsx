@@ -2,9 +2,10 @@ import { Edit2, X, Package as PackageIcon, User as UserIcon, MapPin, Check, XCir
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { getShipmentById, updateShipment, cancelShipment, acceptShipment, rejectShipment, updateShipmentTrackerStatus } from "../../../services/shipmentService";
+import { getShipmentById, updateShipment, cancelShipment, acceptShipment, rejectShipment, updateShipmentTrackerStatus, updateShipmentStatusByStatusId } from "../../../services/shipmentService";
 import { Eye, ArrowLeft, ChevronDown, ChevronRight } from "react-feather";
 import ShipmentStatusTracker from "../../../pages/Tracker/statusTracker";
+import axiosInstance from '../../../utils/axiosInstance';
 
 const STATUS_OPTIONS = [
   "PENDING", "IN_TRANSIT", "DELIVERED", "CANCELLED", "RETURNED", "ACCEPTED", "REJECTED"
@@ -26,6 +27,8 @@ export default function ShipmentDetailsView() {
   const [acceptingShipment, setAcceptingShipment] = useState(false);
   const [rejectingShipment, setRejectingShipment] = useState(false);
   const [permissionError, setPermissionError] = useState(null);
+  const [paying, setPaying] = useState(false);
+  const canPay = !!(shipment && shipment.package && shipment.package.final_cost && shipment.id && (shipment.package_id || shipment.package.id));
 
   // Editable fields aligned with backend
   const editableFields = [
@@ -65,13 +68,36 @@ export default function ShipmentDetailsView() {
   // Handle status update from the tracker
   const handleStatusUpdate = async (newStatus) => {
     try {
-      await updateShipmentTrackerStatus(shipmentId, { action: newStatus });
-      setShipment(prev => ({ ...prev, status_type: newStatus }));
-      toast.success(`Status updated to ${newStatus.replace('_', ' ').toLowerCase()}`);
+      if (isSupplier) {
+        // Prefer top-level status_id if present, else fallback to latest statusHistory id
+        const statusId = shipment.status_id || (statusHistory?.length > 0 ? statusHistory[statusHistory.length - 1]?.id : null);
+        if (!statusId) {
+          toast.error("No status ID found for this shipment.");
+          return;
+        }
+        await updateShipmentStatusByStatusId(statusId, newStatus);
+        setShipment(prev => ({ ...prev, status_type: newStatus }));
+        toast.success(`Status updated to ${newStatus.replace('_', ' ').toLowerCase()}`);
+      } else {
+        await updateShipmentTrackerStatus(shipmentId, { action: newStatus });
+        setShipment(prev => ({ ...prev, status_type: newStatus }));
+        toast.success(`Status updated to ${newStatus.replace('_', ' ').toLowerCase()}`);
+      }
     } catch (error) {
       console.error("Failed to update status:", error);
-      toast.error(error.response?.data?.detail || "Failed to update status");
-      throw error; // Re-throw to handle in the component
+      // Check if it's an authorization error
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        toast.error("You don't have permission to update this shipment status");
+        return;
+      }
+      // Check if it's a validation error
+      if (error.response?.status === 400) {
+        const errorMessage = error.response?.data?.detail || error.response?.data?.message || "Invalid status update";
+        toast.error(errorMessage);
+        return;
+      }
+      toast.error("Failed to update status. Please try again.");
+      throw error; // Re-throw only for unexpected errors
     }
   };
 
@@ -102,9 +128,21 @@ export default function ShipmentDetailsView() {
     shipment.payment_status !== "COMPLETED";
 
   // Check if user can update status (only suppliers can update status via the tracker)
+  // Supplier can only update status AFTER payment is completed by importer
   const canUpdateStatus = shipment &&
     isSupplier &&
-    !["CANCELLED", "DELIVERED", "REJECTED"].includes(shipment.status_type);
+    !["CANCELLED", "DELIVERED", "REJECTED"].includes(shipment.status_type) &&
+    shipment.payment_status === "COMPLETED";
+
+  // DEBUG: Log status update permissions
+  console.log('DEBUG Status Update Check:', {
+    shipment: !!shipment,
+    isSupplier,
+    status_type: shipment?.status_type,
+    payment_status: shipment?.payment_status,
+    canUpdateStatus,
+    user_type: user?.user_type
+  });
 
   const handleAcceptShipment = async () => {
     setAcceptingShipment(true);
@@ -145,6 +183,36 @@ export default function ShipmentDetailsView() {
     return <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${color}`}>{status}</span>;
   };
 
+  function openRazorpay({ order_id, amount, currency, user }) {
+    const options = {
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+      amount: amount * 100, // in paisa
+      currency: currency || 'INR',
+      order_id: order_id,
+      name: 'CourierPro',
+      description: 'Shipment Payment',
+      handler: async function (response) {
+        try {
+          await axiosInstance.post('/shipment/v1/razorpay/verify-payment', {
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_signature: response.razorpay_signature,
+          });
+          toast.success('Payment verified and successful!');
+        } catch (err) {
+          toast.error('Payment verification failed');
+        }
+      },
+      prefill: {
+        email: user.email,
+        contact: user.phone,
+      },
+      theme: { color: '#f97316' },
+    };
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  }
+
   if (loading) {
     return <div className="flex justify-center items-center h-96"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div></div>;
   }
@@ -167,7 +235,72 @@ export default function ShipmentDetailsView() {
 
         {/* Main Content */}
         <div className="p-4 sm:p-8">
+          {isImporterExporter && shipment.status_type?.toUpperCase() === "ACCEPTED" && (
+            <div className="mb-6 flex justify-end">
+              {shipment.payment_status === "COMPLETED" ? (
+                // Payment completed - show success state
+                <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-full px-6 py-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-green-800 font-medium">Payment Completed</span>
+                  <span className="text-green-600 text-sm">₹{shipment.package?.final_cost}</span>
+                </div>
+              ) : (
+                // Payment pending - show pay button
+                <button
+                  className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-6 rounded-full shadow transition disabled:opacity-60"
+                  disabled={paying}
+                  onClick={async () => {
+                    // DEBUG: Log all relevant fields before checking
+                    console.log('DEBUG shipment:', shipment);
+                    console.log('DEBUG shipment.id:', shipment?.id);
+                    console.log('DEBUG shipment.package:', shipment?.package);
+                    console.log('DEBUG shipment.package.final_cost:', shipment?.package?.final_cost);
+                    console.log('DEBUG shipment.package_id:', shipment?.package_id);
+                    console.log('DEBUG shipment.package.id:', shipment?.package?.id);
+                    if (!(shipment && shipment.package && shipment.package.final_cost && shipment.id && (shipment.package_id || shipment.package.id))) {
+                      toast.error("Payment amount or package info missing.");
+                      return;
+                    }
+                    setPaying(true);
+                    try {
+                      const payload = {
+                        amount: shipment.package?.final_cost, // No fallback to 1
+                        shipment_id: shipment.id,
+                        package_id: shipment.package_id || shipment.package?.id,
+                        currency: 'INR'
+                      };
+                      console.log('Razorpay payload:', payload);
+                      const res = await axiosInstance.post('/shipment/v1/razorpay/create-order', payload);
+                      openRazorpay({
+                        order_id: res.data.order_id,
+                        amount: payload.amount,
+                        currency: payload.currency,
+                        user: user,
+                      });
+                    } catch (err) {
+                      toast.error(err?.response?.data?.detail || 'Payment initiation failed');
+                    } finally {
+                      setPaying(false);
+                    }
+                  }}
+                >
+                  {paying ? 'Processing...' : 'Pay'}
+                </button>
+              )}
+            </div>
+          )}
           {/* Status Tracker with Update Button */}
+          {isSupplier && shipment.payment_status !== "COMPLETED" && shipment.status_type === "ACCEPTED" && (
+            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center gap-2 text-yellow-800">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-medium">Waiting for payment completion</span>
+              </div>
+              <p className="text-xs text-yellow-600 mt-1">
+                Status updates will be available once the importer completes the payment.
+              </p>
+            </div>
+          )}
           <ShipmentStatusTracker
             currentStatus={shipment.status_type}
             statusHistory={statusHistory}
