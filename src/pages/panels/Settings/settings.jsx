@@ -269,7 +269,7 @@ export default function Settings() {
                   <FieldInput type={type} />
                 ) : (
                   <p className="text-orange-900 mt-1 select-text text-sm">
-                    {type === "password" && value ? "********" : value || "-"}
+                    {type === "password" && value ? "" : value || "-"}
                   </p>
                 )}
                 {!isEditing && (

@@ -6,11 +6,13 @@ import { Eye, EyeOff, Mail, Lock, User, Phone, MapPin, Truck, Building } from 'l
 
 import axiosInstance from '../../utils/axiosInstance';
 import { isAuthenticated } from '../../utils/auth';
+import { toast } from 'react-toastify';
 
 
 
 
-const Signup = () => {
+
+const Signup = () => {  
     const [formData, setFormData] = useState({
         firstName: '',
         lastName: '',
@@ -30,7 +32,7 @@ const Signup = () => {
     useEffect(() => {
         if (isAuthenticated()) {
             navigate('/dashboard');
-            return; // prevent fetching if already logged in
+            return;
         }
 
         const fetchUserTypes = async () => {
@@ -54,17 +56,16 @@ const Signup = () => {
     };
 
     const handleSubmit = async (e) => {
-        
-             e.preventDefault();
-        setLoading(true);
+    e.preventDefault();
+    setLoading(true);
 
-        if (formData.password !== formData.confirmPassword) {
-            alert("Passwords do not match.");
-            setLoading(false);
-            return;
-        }
+    if (formData.password !== formData.confirmPassword) {
+        alert("Passwords do not match.");
+        setLoading(false);
+        return;
+    }
 
-        try {
+    try {
         const payload = {
             email: formData.email,
             password: formData.password,
@@ -72,19 +73,23 @@ const Signup = () => {
             last_name: formData.lastName,
             phone_number: formData.phone,
             user_type: formData.userType
-        }
+        };
+
         const response = await axiosInstance.post('/user/v1/signup', payload);
         console.log(response);
-        if(response.data.success === true){
+
+        if (response.data.success === true) {
+            toast.success('Account created successfully! Please log in.');
             setLoading(false);
-            navigate('/login')
+            navigate('/login');
         }
-        } catch (error) {
-            console.log(error);
-              setLoading(false);
-            
-        }
-    };
+    } catch (error) {
+        console.log(error);
+        toast.error('Signup failed. Please try again.');
+        setLoading(false);
+    }
+};
+
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 py-12 px-4 sm:px-6 lg:px-8">

@@ -12,6 +12,9 @@ import CreateShipment from './pages/panels/shipments/CreateShipment';
 import ViewShipment from './pages/panels/shipments/ViewShipment';
 import EditShipment from './pages/panels/shipments/EditShipment';
 import Address from './pages/panels/Address/address';
+import Terms from './pages/Terms';         // Add this import
+import Privacy from './pages/Privacy';  
+import 'react-toastify/dist/ReactToastify.css';
 import ForgotPassword from './pages/Auth/ForgotPassword';
 import ResetPassword from './pages/Auth/ResetPassword';
 
@@ -31,6 +34,8 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
         {/* Protected Routes */}
         <Route
           path="/dashboard"
