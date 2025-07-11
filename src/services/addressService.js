@@ -28,3 +28,27 @@ export const patchAddress = async (addressId, patchData) => {
   const response = await api.patch(`/user/v1/update_address/${addressId}`, patchData);
   return response.data;
 };
+
+// Fetch a single address by its address ID
+export const getAddressById = (addressId) => api.get(`/user/v1/address/${addressId}`);
+
+// Replace getCountries with improved version
+export const getCountries = async () => {
+  try {
+    console.log('Fetching countries from API...');
+    const response = await api.get('/user/v1/countries/', {
+      params: {
+        page: 1,
+        limit: 1000 // Request a large limit to get all countries
+      }
+    });
+    console.log('Countries response:', response);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching countries:', error);
+    console.error('Error response:', error.response);
+    console.error('Error status:', error.response?.status);
+    console.error('Error data:', error.response?.data);
+    throw error;
+  }
+};
