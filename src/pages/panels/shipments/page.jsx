@@ -316,8 +316,9 @@ export default function Shipment() {
                     {(user?.user_type === "importer_exporter" || user?.user_type === "super_admin") && (
                     <button
                         onClick={handleCreate}
-                            className="bg-orange-500 text-white px-4 py-2 rounded shadow hover:bg-orange-600"
+                        className="group relative inline-flex items-center gap-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-3 rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 font-semibold"
                     >
+                        <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
                         Create Shipment
                     </button>
                     )}
