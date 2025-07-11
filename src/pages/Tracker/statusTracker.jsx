@@ -164,6 +164,23 @@ const ShipmentStatusTracker = ({ currentStatus, statusHistory = [], onStatusUpda
 
   // Sort statusHistory
   const sortedHistory = [...statusHistory].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+  // Only show the first occurrence of each key status in a fixed order
+  const keyStatuses = ["PENDING", "ACCEPTED", "IN_TRANSIT", "DELIVERED"];
+  const uniqueStatusMap = {};
+  const uniqueHistoryMap = {};
+  for (const entry of sortedHistory) {
+    const status = (entry.status || "").toUpperCase();
+    if (keyStatuses.includes(status) && !uniqueStatusMap[status]) {
+      uniqueStatusMap[status] = true;
+      uniqueHistoryMap[status] = entry;
+    }
+  }
+  // Build the timeline in the fixed order
+  const orderedHistory = keyStatuses
+    .filter(status => uniqueHistoryMap[status])
+    .map(status => uniqueHistoryMap[status]);
+
   const nextStatus = getNextStatus();
 
   return (
@@ -280,7 +297,7 @@ const ShipmentStatusTracker = ({ currentStatus, statusHistory = [], onStatusUpda
       </div>
 
       {/* Status History Dropdown */}
-      {sortedHistory.length > 0 && (
+      {(orderedHistory.length > 0) && (
         <div className="mt-4 pt-4 border-t border-gray-100">
           <button
             onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
@@ -292,12 +309,17 @@ const ShipmentStatusTracker = ({ currentStatus, statusHistory = [], onStatusUpda
 
           {isHistoryExpanded && (
             <div className="mt-2 space-y-1">
-              {sortedHistory.map((history, index) => (
-                <div key={index} className="flex justify-between items-center text-xs text-gray-500">
-                  <span className="font-medium">{history.status}</span>
-                  <span>{new Date(history.created_at).toLocaleString()}</span>
-                </div>
-              ))}
+              {orderedHistory.map((history, index) => {
+                let label = history.status.replace('_', ' ');
+                if (history.status === 'PENDING') label = 'CREATED';
+                if (history.status === 'IN_TRANSIT') label = 'SHIPPED';
+                return (
+                  <div key={index} className="flex justify-between items-center text-xs text-gray-500">
+                    <span className="font-medium">{label.toUpperCase()}</span>
+                    <span>{new Date(history.created_at).toLocaleString()}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

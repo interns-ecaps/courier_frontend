@@ -1,4 +1,4 @@
-import { Edit2, X, Package as PackageIcon, User as UserIcon, MapPin, Check, XCircle } from "lucide-react";
+import { Edit2, X, Package as PackageIcon, User as UserIcon, MapPin, Check, XCircle, Truck, Info } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -6,6 +6,7 @@ import { getShipmentById, updateShipment, cancelShipment, acceptShipment, reject
 import { Eye, ArrowLeft, ChevronDown, ChevronRight } from "react-feather";
 import ShipmentStatusTracker from "../../../pages/Tracker/statusTracker";
 import axiosInstance from '../../../utils/axiosInstance';
+import { getAddressById } from '../../../services/addressService';
 
 const STATUS_OPTIONS = [
   "PENDING", "IN_TRANSIT", "DELIVERED", "CANCELLED", "RETURNED", "ACCEPTED", "REJECTED"
@@ -22,13 +23,14 @@ export default function ShipmentDetailsView() {
   const [editAllMode, setEditAllMode] = useState(false);
   const [editAllIndex, setEditAllIndex] = useState(0);
   const [editAllTempValue, setEditAllTempValue] = useState({});
-  const [showPackageDetails, setShowPackageDetails] = useState(false);
+  const [showPackageDetails, setShowPackageDetails] = useState(true);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [acceptingShipment, setAcceptingShipment] = useState(false);
   const [rejectingShipment, setRejectingShipment] = useState(false);
   const [permissionError, setPermissionError] = useState(null);
   const [paying, setPaying] = useState(false);
   const canPay = !!(shipment && shipment.package && shipment.package.final_cost && shipment.id && (shipment.package_id || shipment.package.id));
+  // No need for deliveryAddress, deliveryAddressLoading, or addressDebug state
 
   // Editable fields aligned with backend
   const editableFields = [
@@ -45,6 +47,7 @@ export default function ShipmentDetailsView() {
     const fetchShipment = async () => {
       try {
         const response = await getShipmentById(shipmentId);
+        console.log('SHIPMENT:', response.data);
         setShipment(response.data);
         // Fetch status history if available
         if (response.data.status_history) {
@@ -52,6 +55,7 @@ export default function ShipmentDetailsView() {
         }
         setEditAllTempValue(response.data);
         setPermissionError(null);
+        // No delivery address fetch needed
       } catch (err) {
         if (err.response && err.response.status === 403) {
           setPermissionError("You do not have permission to view this shipment.");
@@ -224,30 +228,28 @@ export default function ShipmentDetailsView() {
   }
 
   return (
-    <div className="w-full min-h-screen py-6 px-4 bg-[#fff7f0]">
-      <div className="w-full bg-white rounded-none shadow-none overflow-visible">
+    <div>
+      <div className="w-full bg-white rounded-3xl shadow-2xl overflow-visible p-1 sm:p-2">
         {/* Header Bar */}
-        <div className="flex items-center gap-3 px-4 sm:px-8 py-4 sm:py-5 bg-gradient-to-r from-orange-400 to-orange-500">
-          <UserIcon className="text-white" size={24} />
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-wide flex-1">Shipment Details</h2>
+        <div className="flex items-center gap-3 px-4 sm:px-8 py-4 sm:py-5 bg-orange-500 rounded-2xl shadow-lg mb-4">
+          <UserIcon className="text-white drop-shadow-lg" size={24} />
+          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-wide flex-1 drop-shadow">Shipment Details</h2>
           <button onClick={() => navigate(-1)} className="text-white hover:text-orange-100 transition" aria-label="Back to shipments list"><ArrowLeft size={22} /></button>
         </div>
 
         {/* Main Content */}
-        <div className="p-4 sm:p-8">
+        <div className="p-2 sm:p-6">
           {isImporterExporter && shipment.status_type?.toUpperCase() === "ACCEPTED" && (
             <div className="mb-6 flex justify-end">
               {shipment.payment_status === "COMPLETED" ? (
-                // Payment completed - show success state
-                <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-full px-6 py-3">
+                <div className="flex items-center gap-3 bg-green-50/60 border border-green-200/60 rounded-full px-6 py-3 shadow-md backdrop-blur-md">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <span className="text-green-800 font-medium">Payment Completed</span>
                   <span className="text-green-600 text-sm">₹{shipment.package?.final_cost}</span>
                 </div>
               ) : (
-                // Payment pending - show pay button
                 <button
-                  className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-6 rounded-full shadow transition disabled:opacity-60"
+                  className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-6 rounded-full shadow-lg transition disabled:opacity-60"
                   disabled={paying}
                   onClick={async () => {
                     // DEBUG: Log all relevant fields before checking
@@ -291,7 +293,7 @@ export default function ShipmentDetailsView() {
           )}
           {/* Status Tracker with Update Button */}
           {isSupplier && shipment.payment_status !== "COMPLETED" && shipment.status_type === "ACCEPTED" && (
-            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="mb-4 p-4 bg-yellow-50/60 border border-yellow-200/60 rounded-2xl shadow-md backdrop-blur-md">
               <div className="flex items-center gap-2 text-yellow-800">
                 <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
                 <span className="text-sm font-medium">Waiting for payment completion</span>
@@ -301,50 +303,72 @@ export default function ShipmentDetailsView() {
               </p>
             </div>
           )}
-          <ShipmentStatusTracker
-            currentStatus={shipment.status_type}
-            statusHistory={statusHistory}
-            onStatusUpdate={canUpdateStatus ? handleStatusUpdate : null}
-          />
-
-          {/* Top Info Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 mb-6 sm:mb-8">
-            <div>
-              <div className="text-xs text-gray-500 mb-1 flex items-center gap-1"><UserIcon size={14} className="text-orange-400" /> Sender</div>
-              <div className="font-bold text-base sm:text-lg text-gray-900 mb-2">{shipment.sender_name}</div>
-              <div className="text-xs text-gray-500 mb-1">Status</div>
-              <div className="mb-2">{statusBadge(shipment.status_type)}</div>
-              <div className="text-xs text-gray-500 mb-1 flex items-center gap-1"><MapPin size={14} className="text-orange-400" /> Pickup Address</div>
-              <div className="font-semibold text-gray-800 break-words">{shipment.pickup_address_label ?? '-'}</div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500 mb-1 flex items-center gap-1"><UserIcon size={14} className="text-orange-400" /> Recipient</div>
-              <div className="font-bold text-base sm:text-lg text-gray-900 mb-2">{shipment.recipient_name}</div>
-              <div className="text-xs text-gray-500 mb-1">Courier</div>
-              <div className="font-semibold text-gray-800 mb-2">{shipment.courier_name ?? '-'}</div>
-              <div className="text-xs text-gray-500 mb-1 flex items-center gap-1"><MapPin size={14} className="text-orange-400" /> Delivery Address</div>
-              <div className="font-semibold text-gray-800 break-words">{shipment.delivery_address_text ?? '-'}</div>
-            </div>
+          <div className="mb-8">
+            <ShipmentStatusTracker
+              currentStatus={shipment.status_type}
+              statusHistory={statusHistory}
+              onStatusUpdate={canUpdateStatus ? handleStatusUpdate : null}
+              glassmorphic // (pass a prop if you want to style inside the tracker too)
+            />
           </div>
 
-          {/* Rest of your existing content... */}
+          {/* Shipment Info Section (no card) */}
+          <div className="flex flex-col md:flex-row md:divide-x md:divide-gray-200 md:gap-20 gap-10 mb-10">
+            {/* Sender */}
+            <div className="flex-1 px-2 md:px-8 pb-8 md:pb-0">
+              <div className="flex items-center gap-2 mb-2">
+                <UserIcon size={22} className="text-orange-500" />
+                <span className="uppercase text-xs font-semibold tracking-wider text-gray-500">Sender</span>
+              </div>
+              <div className="text-base text-gray-900 mb-1 leading-tight pt-1 pb-1">{shipment.sender_name}</div>
+              <div className="flex items-center gap-2 mb-1 pt-1">
+                <Info size={18} className="text-orange-400" />
+                <span className="text-xs text-gray-500 font-semibold">Status</span>
+              </div>
+              <div className="mb-2">{statusBadge(shipment.status_type)}</div>
+              <div className="flex items-center gap-2 text-xs text-gray-500 font-semibold mb-1 pt-1">
+                <MapPin size={18} className="text-orange-400" /> Pickup Address
+              </div>
+              <div className="text-gray-800 break-words text-base">{shipment.pickup_address_label ?? '-'}</div>
+            </div>
+            {/* Recipient */}
+            <div className="flex-1 px-2 md:px-8 pt-8 md:pt-0">
+              <div className="flex items-center gap-2 mb-2">
+                <UserIcon size={22} className="text-orange-500" />
+                <span className="uppercase text-xs font-semibold tracking-wider text-gray-500">Recipient</span>
+              </div>
+              <div className="text-base text-gray-900 mb-1 leading-tight pt-1 pb-1">{shipment.recipient_name}</div>
+              <div className="flex items-center gap-2 text-xs text-gray-500 font-semibold mb-1 pt-1">
+                <Truck size={18} className="text-orange-400" /> Courier
+              </div>
+              <div className="text-gray-800 mb-2 text-base">{shipment.courier_name ?? '-'}</div>
+              <div className="flex items-center gap-2 text-xs text-gray-500 font-semibold mb-1 pt-1">
+                <MapPin size={18} className="text-orange-400" /> Delivery Address
+              </div>
+              <div className="text-gray-800 break-words text-base">
+                {shipment?.delivery_address_text || '-'}
+              </div>
+            </div>
+      </div>
+
           {/* Divider */}
-          <div className="border-t border-orange-100 my-4 sm:my-6" />
-          {/* Package Section */}
-          <div className="bg-orange-50 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 overflow-x-auto">
+          <div className="border-t border-orange-100/60 my-4 sm:my-6" />
+
+          {/* Glassmorphic Package Section */}
+          <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 overflow-x-auto">
             <PackageIcon size={22} className="text-orange-400 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-xs text-gray-500 mb-1">Package</div>
               <div className="font-semibold text-sm sm:text-base text-orange-700 flex items-center gap-2 flex-wrap">
                 {shipment.package_label ?? '-'}
                 {shipment.package && (
-                  <button
-                    className="ml-2 text-orange-600 hover:text-orange-800 focus:outline-none rounded-full p-1 transition hover:bg-orange-200"
+        <button
+                    className="ml-2 text-orange-600 hover:text-orange-800 focus:outline-none rounded-full p-1 transition hover:bg-orange-200/60"
                     onClick={() => setShowPackageDetails((prev) => !prev)}
                     aria-label={showPackageDetails ? 'Hide package details' : 'Show package details'}
-                  >
+        >
                     {showPackageDetails ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                  </button>
+        </button>
                 )}
               </div>
               {showPackageDetails && shipment.package && (
@@ -360,24 +384,45 @@ export default function ShipmentDetailsView() {
             </div>
           </div>
 
-          {/* Meta Info Section */}
-          <div className="bg-white rounded-xl p-4 sm:p-6 shadow border border-orange-50 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          {/* Divider after package details */}
+          <div className="border-t border-gray-200 my-6" />
+
+          {/* Glassmorphic Meta Info Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-8">
             <div>
               <div className="text-xs text-gray-500 mb-1">Special Instructions</div>
               <div className="mb-3 sm:mb-4">{shipment.special_instructions ?? '-'}</div>
               <div className="text-xs text-gray-500 mb-1">Signature Required</div>
               <div className="mb-3 sm:mb-4">{shipment.signature_required ? 'Yes' : 'No'}</div>
               <div className="text-xs text-gray-500 mb-1">Estimated Delivery</div>
-              {isSupplier && shipment.status_type !== 'DELIVERED' ? (
+              {isSupplier && shipment.status_type === 'IN_TRANSIT' && shipment.payment_status === 'COMPLETED' ? (
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault();
+                    const etaValue = e.target.eta.value;
+                    if (!etaValue) {
+                      toast.error('Please select a date and time.');
+                      return;
+                    }
+                    const etaDate = new Date(etaValue);
+                    const now = new Date();
+                    const pickupDate = shipment.pickup_date ? new Date(shipment.pickup_date) : null;
+                    if (etaDate < now) {
+                      toast.error('ETA cannot be before the current date and time.');
+                      return;
+                    }
+                    if (pickupDate && etaDate < pickupDate) {
+                      toast.error('ETA cannot be before the pickup date.');
+                      return;
+                    }
                     try {
-                      await updateShipment(shipment.id, { estimated_delivery: e.target.eta.value });
-                      setShipment((prev) => ({ ...prev, estimated_delivery: e.target.eta.value }));
+                      // Ensure ISO string format for backend
+                      const isoEta = etaDate.toISOString();
+                      await updateShipment(shipment.id, { estimated_delivery: isoEta });
+                      setShipment((prev) => ({ ...prev, estimated_delivery: isoEta }));
                       toast.success('ETA updated!');
                     } catch (err) {
-                      toast.error('Failed to update ETA');
+                      toast.error(err?.response?.data?.detail || err?.message || 'Failed to update ETA');
                     }
                   }}
                   className="flex gap-2 items-center"
@@ -386,85 +431,55 @@ export default function ShipmentDetailsView() {
                     type="datetime-local"
                     name="eta"
                     defaultValue={shipment.estimated_delivery ? new Date(shipment.estimated_delivery).toISOString().slice(0, 16) : ''}
-                    className="border p-2 rounded"
+                    className="border p-2 rounded bg-white/60 backdrop-blur"
                     required
                   />
-                  <button type="submit" className="bg-orange-500 text-white px-3 py-1 rounded hover:bg-orange-600">Save</button>
+                  <button type="submit" className="bg-orange-500/80 text-white px-3 py-1 rounded hover:bg-orange-600/80 shadow">Save</button>
                 </form>
               ) : (
-                <div>{shipment.status_type === 'DELIVERED' ? '-' : (shipment.estimated_delivery ? new Date(shipment.estimated_delivery).toLocaleString() : '-')}</div>
+                <div>{shipment.estimated_delivery ? new Date(shipment.estimated_delivery).toLocaleDateString() : '-'}</div>
               )}
             </div>
             <div>
               <div className="text-xs text-gray-500 mb-1">Insurance Required</div>
               <div className="mb-3 sm:mb-4">{shipment.insurance_required ? 'Yes' : 'No'}</div>
               <div className="text-xs text-gray-500 mb-1">Pickup Date</div>
-              <div className="mb-3 sm:mb-4">{shipment.pickup_date ? new Date(shipment.pickup_date).toLocaleString() : '-'}</div>
-              {shipment.status_type === 'DELIVERED' && (
-                <>
-                  <div className="text-xs text-gray-500 mb-1">Delivery Date</div>
-                  <div>{shipment.delivery_date ? new Date(shipment.delivery_date).toLocaleString() : '-'}</div>
-                </>
-              )}
+              <div className="mb-3 sm:mb-4">{shipment.pickup_date ? new Date(shipment.pickup_date).toLocaleDateString() : '-'}</div>
+              {/* Delivered Date (from status history) */}
+              <div className="text-xs text-gray-500 mb-1">Delivered Date</div>
+              <div>
+                {(() => {
+                  const deliveredEntry = statusHistory.find(
+                    (entry) => entry.status === 'DELIVERED'
+                  );
+                  return deliveredEntry
+                    ? new Date(deliveredEntry.created_at).toLocaleDateString()
+                    : '-';
+                })()}
+              </div>
             </div>
           </div>
 
           {/* Actions - Only show if not in final states */}
-          {shipment && !["REJECTED", "DELIVERED", "CANCELLED"].includes(shipment.status_type) && (
+          {shipment && !["REJECTED", "DELIVERED", "CANCELLED"].includes(shipment.status_type) && isSupplier && shipment.payment_status === "COMPLETED" && (
             <div className="flex gap-4 mt-8 items-center justify-end">
-              {canEdit && (
-                <button
-                  onClick={() => setEditAllMode(true)}
-                  className="bg-gray-200 text-gray-700 px-4 py-2 rounded shadow hover:bg-gray-300 flex items-center gap-2"
-                  aria-label="Edit shipment"
+              {shipment.status_type === "PENDING" && (
+          <button
+                  onClick={handleAcceptShipment}
+                  disabled={acceptingShipment}
+                  className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 flex items-center gap-2 ${acceptingShipment
+                      ? 'bg-gray-300/70 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-green-500/80 to-green-600/80 hover:from-green-600/90 hover:to-green-700/90 text-white shadow-lg shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40 backdrop-blur'
+                    }`}
+                  aria-label="Accept shipment"
                 >
-                  <Edit2 size={18} /> Edit
-                </button>
-              )}
-              {canCancel && (
-                <button
-                  onClick={() => setShowCancelConfirm(true)}
-                  className="p-2 hover:bg-orange-100 rounded-full"
-                  aria-label="Cancel shipment"
-                >
-                  <X size={22} className="text-orange-500" />
-                </button>
-              )}
-              {canAcceptReject && (
-                <>
-                  <button
-                    onClick={handleAcceptShipment}
-                    disabled={acceptingShipment}
-                    className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 flex items-center gap-2 ${acceptingShipment
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/40'
-                      }`}
-                    aria-label="Accept shipment"
-                  >
-                    {acceptingShipment ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b border-white"></div>
-                    ) : (
-                      <Check size={18} />
-                    )}
-                    Accept Shipment
-                  </button>
-                  <button
-                    onClick={handleRejectShipment}
-                    disabled={rejectingShipment}
-                    className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 flex items-center gap-2 ${rejectingShipment
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/40'
-                      }`}
-                    aria-label="Reject shipment"
-                  >
-                    {rejectingShipment ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b border-white"></div>
-                    ) : (
-                      <XCircle size={18} />
-                    )}
-                    Reject Shipment
-                  </button>
-                </>
+                  {acceptingShipment ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b border-white"></div>
+                  ) : (
+                    <Check size={18} />
+                  )}
+                  Accept Shipment
+          </button>
               )}
             </div>
           )}
@@ -472,13 +487,13 @@ export default function ShipmentDetailsView() {
 
         {/* Cancel Modal */}
         {showCancelConfirm && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50">
+          <div className="fixed inset-0 flex items-center justify-center bg-black/30 z-50">
             <div className="bg-white rounded-xl shadow-lg p-8 max-w-sm w-full">
               <h3 className="text-lg font-semibold mb-4 text-orange-700">Cancel Shipment</h3>
               <p className="mb-6">Are you sure you want to cancel this shipment?</p>
               <div className="flex gap-4 justify-end">
-                <button onClick={async () => { await cancelShipment(shipment.id); toast.success('Shipment cancelled!'); setShowCancelConfirm(false); navigate(0); }} className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">Yes, Cancel</button>
-                <button onClick={() => setShowCancelConfirm(false)} className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">No</button>
+                <button onClick={async () => { await cancelShipment(shipment.id); toast.success('Shipment cancelled!'); setShowCancelConfirm(false); navigate(0); }} className="bg-orange-500/80 text-white px-4 py-2 rounded hover:bg-orange-600/80 shadow">Yes, Cancel</button>
+                <button onClick={() => setShowCancelConfirm(false)} className="bg-gray-200/80 text-gray-700 px-4 py-2 rounded hover:bg-gray-300/80 shadow">No</button>
               </div>
             </div>
           </div>

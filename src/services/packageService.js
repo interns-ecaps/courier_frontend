@@ -8,3 +8,8 @@ export const getMyPackages = () => {
     params: { user_id: user.id },
   });
 };
+
+// Fetch a package by its ID
+export const getPackageById = (packageId) => {
+  return api.get(`/shipment/v1/packages/${packageId}/`);
+};
