@@ -1,5 +1,5 @@
 // src/pages/panels/shipments/page.jsx
-import { Edit2, Eye, Plus, Copy, Trash2, X, Check, XCircle } from "react-feather";
+import { Edit2, Eye, Plus, Copy, Trash2, X, Check, XCircle, Package, Truck, Calendar, DollarSign, Users, MapPin, Clock, TrendingUp } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../../../components/common/Navbar";
@@ -12,7 +12,7 @@ const shipmentFields = [
     { key: "recipient_name", label: "Recipient" },
     { key: "supplier_name", label: "Supplier" },
     { key: "status_type", label: "Status" },
-    { key: "price", label: "Price" }, // <-- Add Price column here
+    { key: "price", label: "Price" },
     { key: "pickup_date", label: "Pickup Date" },
     { key: "estimated_delivery", label: "ETA" },
     { key: "tracking_number", label: "Tracking #" },
@@ -25,19 +25,18 @@ export default function Shipment() {
     const [creatingShipment, setCreatingShipment] = useState(false);
     const [viewingShipment, setViewingShipment] = useState(null);
     const [editingShipment, setEditingShipment] = useState(null);
-    // === Tabs UI with All Shipments and status tabs ===
     const [activeTab, setActiveTab] = useState("all");
     const [statusFilter, setStatusFilter] = useState("");
     const [supplierFilter, setSupplierFilter] = useState("");
 
     const tabs = [
-        { key: "all", label: "All Shipments" },
-        { key: "pending", label: "Pending" },
-        { key: "in_transit", label: "In Transit" },
-        { key: "accepted", label: "Accepted" },
-        { key: "delivered", label: "Delivered" },
-        { key: "rejected", label: "Rejected" },
-        { key: "cancelled", label: "Cancelled" },
+        { key: "all", label: "All Shipments", icon: Package },
+        { key: "pending", label: "Pending", icon: Clock },
+        { key: "in_transit", label: "In Transit", icon: Truck },
+        { key: "accepted", label: "Accepted", icon: Check },
+        { key: "delivered", label: "Delivered", icon: TrendingUp },
+        { key: "rejected", label: "Rejected", icon: XCircle },
+        { key: "cancelled", label: "Cancelled", icon: X },
     ];
 
     const [cancellingShipmentId, setCancellingShipmentId] = useState(null);
@@ -62,32 +61,36 @@ export default function Shipment() {
 
     // Fetch shipments with backend pagination
     useEffect(() => {
-      const fetchShipments = async () => {
-        if (!user) return;
-        setLoading(true);
-        try {
-          let filters = {};
-          if (user.user_type === "supplier") {
-            filters = {};
-          } else if (user.user_type === "courier") {
-            filters = { courier_id: user.id };
-          } else if (user.user_type === "super_admin") {
-            filters = {};
-          } else {
-            filters = { sender_id: user.id };
-          }
-          const response = await getAllShipments({ ...filters, page: currentPage, limit: rowsPerPage });
-          setBackendShipments(response.results || []);
-          setTotalRows(response.total || 0);
-        } catch (error) {
-          console.error("Failed to fetch shipments", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchShipments();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user, currentPage]);
+        const fetchShipments = async () => {
+            if (!user) return;
+            setLoading(true);
+            try {
+                let filters = {};
+                if (user.user_type === "supplier") {
+                    filters = {};
+                } else if (user.user_type === "courier") {
+                    filters = { courier_id: user.id };
+                } else if (user.user_type === "super_admin") {
+                    filters = {};
+                } else {
+                    filters = { sender_id: user.id };
+                }
+                // Add status_type filter if not "all"
+                if (activeTab !== "all") {
+                    filters.status_type = activeTab;
+                }
+                const response = await getAllShipments({ ...filters, page: currentPage, limit: rowsPerPage });
+                setBackendShipments(response.results || []);
+                setTotalRows(response.total || 0);
+            } catch (error) {
+                console.error("Failed to fetch shipments", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchShipments();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, currentPage, activeTab]);
 
     const totalPages = Math.ceil(totalRows / rowsPerPage);
 
@@ -181,37 +184,24 @@ export default function Shipment() {
         }
     };
 
-    console.log("User type:", user?.user_type);
-    console.log("Total shipments:", shipments.length);
-    console.log("Shipments data:", shipments);
-
-    // Filtering logic
-    const filteredShipments = backendShipments.filter((shipment) => {
-        if (activeTab !== "all") {
-            return shipment.status_type?.toLowerCase() === activeTab;
-        }
-        return true;
-    });
-    console.log("Filtered Shipments rendering:", filteredShipments);
-
     const statusBadge = (status) => {
         const s = status?.toLowerCase();
-        let classes = "inline-flex items-center px-4 py-1 rounded-full text-sm font-bold shadow-sm border-2 mr-1";
-        
-        if (s === "pending") classes += " bg-yellow-100 text-yellow-800 border-yellow-300";
-        else if (s === "in_transit") classes += " bg-blue-100 text-blue-800 border-blue-300";
-        else if (s === "accepted" || s === "delivered") classes += " bg-green-100 text-green-800 border-green-300";
-        else if (s === "rejected") classes += " bg-red-100 text-red-800 border-red-400";
-        else if (s === "cancelled") classes += " bg-gray-200 text-gray-700 border-gray-400";
-        else classes += " bg-gray-100 text-gray-700 border-gray-300";
+        let classes = "inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm border transition-all duration-200";
+
+        if (s === "pending") classes += " bg-yellow-50 text-yellow-700 border-yellow-200";
+        else if (s === "in_transit") classes += " bg-blue-50 text-blue-700 border-blue-200";
+        else if (s === "accepted" || s === "delivered") classes += " bg-green-50 text-green-700 border-green-200";
+        else if (s === "rejected") classes += " bg-red-50 text-red-700 border-red-200";
+        else if (s === "cancelled") classes += " bg-gray-50 text-gray-600 border-gray-200";
+        else classes += " bg-gray-50 text-gray-600 border-gray-200";
 
         return (
             <span className={classes}>
                 <div className={`w-2 h-2 rounded-full mr-2 ${s === "pending" ? "bg-yellow-500" :
-                        s === "in_transit" ? "bg-blue-500" :
-                            (s === "accepted" || s === "delivered") ? "bg-green-500" :
-                                s === "rejected" ? "bg-red-500" :
-                                    s === "cancelled" ? "bg-gray-500" : "bg-gray-400"
+                    s === "in_transit" ? "bg-blue-500" :
+                        (s === "accepted" || s === "delivered") ? "bg-green-500" :
+                            s === "rejected" ? "bg-red-500" :
+                                s === "cancelled" ? "bg-gray-400" : "bg-gray-400"
                     }`}></div>
                 {status?.charAt(0).toUpperCase() + status?.slice(1).toLowerCase()}
             </span>
@@ -220,143 +210,316 @@ export default function Shipment() {
 
     const copyToClipboard = (text) => {
         navigator.clipboard.writeText(text);
+        toast.success("Tracking number copied to clipboard!");
     };
 
     const ShipmentsListing = () => (
-        <div className="flex-1 min-h-0 flex flex-col bg-[#fff7f0] w-full h-full p-2 sm:p-4 md:p-6">
-            <div className="w-full flex flex-col items-start justify-start mb-4">
-                <h1 className="text-4xl font-extrabold text-gray-800 mb-2 ml-2 drop-shadow-sm">Shipments</h1>
-            </div>
-            <div className="flex-1 flex flex-col items-center justify-start min-h-0 w-full h-full">
-                <div className="w-full flex-1 flex flex-col bg-white rounded-3xl shadow-2xl border border-orange-100 p-0 h-full">
-                    {/* Create Shipment Button (top right) */}
-                    {(user?.user_type === "importer_exporter" || user?.user_type === "super_admin") && (
-                        <div className="flex justify-end p-2 sm:p-4 md:p-6 pb-0">
-                            <button
-                                onClick={handleCreate}
-                                className="bg-orange-500 text-white px-6 py-3 rounded-xl shadow-lg hover:bg-orange-600 active:bg-orange-700 transition-all text-lg font-semibold"
-                            >
-                                Create Shipment
-                            </button>
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50">
+            <div className="p-4 sm:p-6 lg:p-8">
+                {/* Header Section */}
+                <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-3xl shadow-xl mb-8 overflow-hidden">
+                    <div className="p-6 sm:p-8">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm shadow-lg">
+                                    <Package className="w-6 h-6 text-white" />
+                                </div>
+                                <div>
+                                    <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+                                        Shipment Management
+                                    </h1>
+                                    <p className="text-orange-100 text-sm sm:text-base">
+                                        Track and manage all your shipments in one place
+                                    </p>
+                                </div>
+                            </div>
+                            {(user?.user_type === "importer_exporter" || user?.user_type === "super_admin") && (
+                                <button
+                                    onClick={handleCreate}
+                                    className="bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-2xl font-semibold shadow-lg hover:bg-white/30 transition-all duration-300 transform hover:scale-105 flex items-center gap-2"
+                                >
+                                    <Plus className="w-5 h-5" />
+                                    Create Shipment
+                                </button>
+                            )}
                         </div>
-                    )}
-                    {/* Tabs UI */}
-                    <div className="flex gap-3 mb-6 px-4 pt-4 flex-wrap">
-                        {tabs.map(tab => (
-                            <button
-                                key={tab.key}
-                                onClick={() => setActiveTab(tab.key)}
-                                className={`relative px-6 py-3 rounded-2xl font-semibold text-base transition-all duration-300 shadow-sm border-2 ${activeTab === tab.key ? 'bg-orange-500 text-white border-orange-500 scale-105' : 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200 hover:scale-105'}`}
-                            >
-                                {tab.label}
-                            </button>
-                        ))}
                     </div>
-                    {/* Table Container with horizontal scroll on small screens */}
-                    <div className="flex-1 flex flex-col min-h-0 w-full h-full overflow-x-auto">
-                        <div className="w-full min-w-[900px] md:min-w-0 h-full px-0 pb-0">
-                            <table className="w-full h-full table-fixed text-sm">
-                                <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 h-14">
-                                    <tr className="h-14">
-                                        {/* Conditionally render Sender column */}
+                </div>
+
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-orange-100 hover:shadow-xl transition-all duration-300">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-gray-600">Total Shipments</p>
+                                <p className="text-2xl font-bold text-gray-900">{totalRows}</p>
+                            </div>
+                            <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl flex items-center justify-center">
+                                <Package className="w-6 h-6 text-white" />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-orange-100 hover:shadow-xl transition-all duration-300">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-gray-600">In Transit</p>
+                                <p className="text-2xl font-bold text-blue-600">
+                                    {backendShipments.filter(s => s.status_type?.toLowerCase() === 'in_transit').length}
+                                </p>
+                            </div>
+                            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                                <Truck className="w-6 h-6 text-white" />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-orange-100 hover:shadow-xl transition-all duration-300">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-gray-600">Pending</p>
+                                <p className="text-2xl font-bold text-yellow-600">
+                                    {backendShipments.filter(s => s.status_type?.toLowerCase() === 'pending').length}
+                                </p>
+                            </div>
+                            <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center">
+                                <Clock className="w-6 h-6 text-white" />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-orange-100 hover:shadow-xl transition-all duration-300">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-gray-600">Delivered</p>
+                                <p className="text-2xl font-bold text-green-600">
+                                    {backendShipments.filter(s => s.status_type?.toLowerCase() === 'delivered').length}
+                                </p>
+                            </div>
+                            <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                                <Check className="w-6 h-6 text-white" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Main Content Card */}
+                <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-orange-100 overflow-hidden">
+                    {/* Tabs UI */}
+                    <div className="p-6 border-b border-orange-100">
+                        <div className="flex gap-2 overflow-x-auto pb-2">
+                            {tabs.map(tab => {
+                                const IconComponent = tab.icon;
+                                return (
+                                    <button
+                                        key={tab.key}
+                                        onClick={() => setActiveTab(tab.key)}
+                                        className={`relative px-6 py-3 rounded-2xl font-semibold text-sm transition-all duration-300 shadow-sm border-2 flex items-center gap-2 whitespace-nowrap ${
+                                            activeTab === tab.key 
+                                                ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-500 scale-105 shadow-lg' 
+                                                : 'bg-white/80 text-gray-700 border-orange-200 hover:bg-orange-50 hover:scale-105 hover:shadow-md'
+                                        }`}
+                                    >
+                                        <IconComponent className="w-4 h-4" />
+                                        {tab.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Table Container */}
+                    <div className="overflow-x-auto">
+                        <div className="min-w-full">
+                            <table className="w-full">
+                                <thead className="bg-gradient-to-r from-gray-50 to-orange-50 border-b border-orange-100">
+                                    <tr>
                                         {['super_admin', 'supplier'].includes(user?.user_type) && (
-                                            <th className="truncate px-4 py-3 text-base font-bold">Sender</th>
+                                            <th className="px-6 py-4 text-left font-semibold text-gray-700">
+                                                <div className="flex items-center gap-2">
+                                                    <Users className="w-4 h-4" />
+                                                    Sender
+                                                </div>
+                                            </th>
                                         )}
-                                        <th className="truncate px-4 py-3 text-base font-bold">Recipient</th>
-                                        <th className="truncate px-4 py-3 text-base font-bold">Supplier</th>
-                                        <th className="truncate px-4 py-3 text-base font-bold">Status</th>
-                                        <th className="truncate px-4 py-3 text-base font-bold">Price</th>
-                                        <th className="truncate px-4 py-3 text-base font-bold">Pickup</th>
-                                        <th className="truncate px-4 py-3 text-base font-bold">ETA</th>
-                                        <th className="truncate px-4 py-3 text-base font-bold">Tracking #</th>
-                                        <th className="truncate px-4 py-3 text-base font-bold">Actions</th>
+                                        <th className="px-6 py-4 text-left font-semibold text-gray-700">
+                                            <div className="flex items-center gap-2">
+                                                <Users className="w-4 h-4" />
+                                                Recipient
+                                            </div>
+                                        </th>
+                                        <th className="px-6 py-4 text-left font-semibold text-gray-700">
+                                            <div className="flex items-center gap-2">
+                                                <Truck className="w-4 h-4" />
+                                                Supplier
+                                            </div>
+                                        </th>
+                                        <th className="px-6 py-4 text-left font-semibold text-gray-700">
+                                            Status
+                                        </th>
+                                        <th className="px-6 py-4 text-right font-semibold text-gray-700">
+                                            <div className="flex items-center gap-2 justify-end">
+                                                <DollarSign className="w-4 h-4" />
+                                                Price
+                                            </div>
+                                        </th>
+                                        <th className="px-6 py-4 text-center font-semibold text-gray-700">
+                                            <div className="flex items-center gap-2 justify-center">
+                                                <Calendar className="w-4 h-4" />
+                                                Pickup
+                                            </div>
+                                        </th>
+                                        <th className="px-6 py-4 text-center font-semibold text-gray-700">
+                                            <div className="flex items-center gap-2 justify-center">
+                                                <Clock className="w-4 h-4" />
+                                                ETA
+                                            </div>
+                                        </th>
+                                        <th className="px-6 py-4 text-center font-semibold text-gray-700">
+                                            <div className="flex items-center gap-2 justify-center">
+                                                <MapPin className="w-4 h-4" />
+                                                Tracking #
+                                            </div>
+                                        </th>
+                                        <th className="px-6 py-4 text-center font-semibold text-gray-700">
+                                            Actions
+                                        </th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100">
+                                <tbody className="divide-y divide-orange-100">
                                     {loading && (
-                                        <tr className="h-12">
-                                            <td colSpan={9} className="py-12 text-center">
+                                        <tr>
+                                            <td colSpan={9} className="py-16 text-center">
                                                 <div className="flex flex-col items-center gap-4">
-                                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                                                    <span className="text-gray-500 font-medium">Loading shipments...</span>
+                                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+                                                    <span className="text-gray-600 font-medium">Loading shipments...</span>
                                                 </div>
                                             </td>
                                         </tr>
                                     )}
-                                    {!loading && filteredShipments.length === 0 && (
-                                        <tr className="h-12">
-                                            <td colSpan={9} className="py-16 text-center">
+                                    {!loading && backendShipments.length === 0 && (
+                                        <tr>
+                                            <td colSpan={9} className="py-20 text-center">
                                                 <div className="flex flex-col items-center gap-4">
                                                     <div className="text-6xl opacity-50">📦</div>
                                                     <div className="text-gray-500">
-                                                        <p className="text-lg font-medium">No shipments found</p>
+                                                        <p className="text-xl font-semibold">No shipments found</p>
                                                         <p className="text-sm">No shipments match your current filter criteria.</p>
                                                     </div>
                                                 </div>
                                             </td>
                                         </tr>
                                     )}
-                                    {!loading && filteredShipments.map((shipment) => (
-                                        <tr key={shipment.id} className="text-sm h-14 hover:bg-orange-50 transition-all">
-                                            {/* Conditionally render Sender column */}
+                                    {!loading && backendShipments.map((shipment) => (
+                                        <tr
+                                            key={shipment.id}
+                                            className="group hover:bg-orange-50/50 transition-all duration-300"
+                                        >
                                             {['super_admin', 'supplier'].includes(user?.user_type) && (
-                                                <td className="truncate px-4 py-3" title={shipment.sender_name}>{shipment.sender_name}</td>
+                                                <td className="px-6 py-4">
+                                                    <div className="font-medium text-gray-900">{shipment.sender_name}</div>
+                                                </td>
                                             )}
-                                            <td className="truncate px-4 py-3" title={shipment.recipient_name}>{shipment.recipient_name}</td>
-                                            <td className="truncate px-4 py-3" title={shipment.supplier_name}>{shipment.supplier_name}</td>
-                                            <td className="truncate px-4 py-3">{statusBadge(shipment.status_type)}</td>
-                                            <td className="truncate px-4 py-3">{shipment.package && shipment.package.final_cost != null ? `${shipment.package.final_cost} ${shipment.package.currency || ''}` : <span className="text-gray-400 italic">N/A</span>}</td>
-                                            <td className="truncate px-4 py-3">{shipment.pickup_date ? new Date(shipment.pickup_date).toLocaleDateString() : <span className="text-gray-400 italic">N/A</span>}</td>
-                                            <td className="truncate px-4 py-3">{shipment.estimated_delivery ? new Date(shipment.estimated_delivery).toLocaleDateString() : <span className="text-gray-400 italic">N/A</span>}</td>
-                                            <td className="truncate px-4 py-3 font-mono" title={shipment.tracking_number}>
-                                                <span className="block max-w-[120px] truncate cursor-pointer" title={shipment.tracking_number}>{shipment.tracking_number}</span>
+                                            <td className="px-6 py-4">
+                                                <div className="font-medium text-gray-900">{shipment.recipient_name}</div>
                                             </td>
-                                            <td className="truncate px-4 py-3 text-center">
-                                                <button
-                                                    title="View Details"
-                                                    aria-label={`View shipment ${shipment.id}`}
-                                                    onClick={() => handleView(shipment.id)}
-                                                    className="p-1 hover:bg-gray-100 rounded-full text-gray-600"
-                                                >
-                                                    <Eye size={16} />
-                                                </button>
-                                                {user?.user_type !== "supplier" && !["cancelled", "delivered", "accepted"].includes(shipment.status_type?.toLowerCase()) && (
-                                                    <button
-                                                        title="Edit Shipment"
-                                                        aria-label={`Edit shipment ${shipment.id}`}
-                                                        onClick={() => handleEdit(shipment)}
-                                                        className="p-1 hover:bg-gray-100 rounded-full text-green-600"
-                                                    >
-                                                        <Edit2 size={16} />
-                                                    </button>
+                                            <td className="px-6 py-4">
+                                                <div className="font-medium text-gray-900">{shipment.supplier_name}</div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {statusBadge(shipment.status_type)}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                {shipment.package && shipment.package.final_cost != null ? (
+                                                    <div className="font-semibold text-gray-900">
+                                                        {shipment.package.final_cost} {shipment.package.currency || ''}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-gray-400 italic">N/A</span>
                                                 )}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                {shipment.pickup_date ? (
+                                                    <div className="text-sm text-gray-600">
+                                                        {new Date(shipment.pickup_date).toLocaleDateString()}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-gray-400 italic">N/A</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                {shipment.estimated_delivery ? (
+                                                    <div className="text-sm text-gray-600">
+                                                        {new Date(shipment.estimated_delivery).toLocaleDateString()}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-gray-400 italic">N/A</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                {shipment.tracking_number ? (
+                                                    <button
+                                                        onClick={() => copyToClipboard(shipment.tracking_number)}
+                                                        className="font-mono text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-lg transition-colors duration-200 cursor-pointer"
+                                                        title="Click to copy"
+                                                    >
+                                                        {shipment.tracking_number}
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-gray-400 italic">N/A</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <button
+                                                        title="View Details"
+                                                        onClick={() => handleView(shipment.id)}
+                                                        className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all duration-200 hover:scale-110"
+                                                    >
+                                                        <Eye className="w-4 h-4" />
+                                                    </button>
+                                                    {user?.user_type !== "supplier" && !["cancelled", "delivered", "accepted"].includes(shipment.status_type?.toLowerCase()) && (
+                                                        <button
+                                                            title="Edit Shipment"
+                                                            onClick={() => handleEdit(shipment)}
+                                                            className="p-2 rounded-xl bg-green-50 text-green-600 hover:bg-green-100 transition-all duration-200 hover:scale-110"
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-                        {/* Pagination Controls (not sticky, just below table) */}
-                        {totalPages > 1 && (
-                            <div className="w-full bg-white border-t border-orange-100 px-0 py-2 sm:py-4 z-10 flex justify-center items-center gap-2 sm:gap-4 flex-wrap">
+                    </div>
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="p-6 border-t border-orange-100 bg-gradient-to-r from-gray-50 to-orange-50">
+                            <div className="flex justify-center items-center gap-4">
                                 <button
                                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                                     disabled={currentPage === 1}
-                                    className="px-3 sm:px-4 py-2 rounded bg-gray-200 text-gray-700 font-semibold disabled:opacity-50"
+                                    className="px-4 py-2 rounded-xl bg-white border border-orange-200 text-gray-700 font-semibold disabled:opacity-50 hover:bg-orange-50 transition-all duration-200"
                                 >
                                     Previous
                                 </button>
-                                <span className="font-medium">Page {currentPage} of {totalPages}</span>
+                                <span className="font-medium text-gray-700">
+                                    Page {currentPage} of {totalPages}
+                                </span>
                                 <button
                                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                                     disabled={currentPage === totalPages}
-                                    className="px-3 sm:px-4 py-2 rounded bg-gray-200 text-gray-700 font-semibold disabled:opacity-50"
+                                    className="px-4 py-2 rounded-xl bg-white border border-orange-200 text-gray-700 font-semibold disabled:opacity-50 hover:bg-orange-50 transition-all duration-200"
                                 >
                                     Next
                                 </button>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -364,7 +527,6 @@ export default function Shipment() {
 
     return (
         <>
-            {/* <Navbar /> */}
             {!editingShipment && !creatingShipment && <ShipmentsListing />}
             {viewingShipment && <ShipmentDetailsView shipment={viewingShipment} />}
             {editingShipment && (

@@ -1,5 +1,5 @@
 // src/components/shipments/ShipmentForm.jsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, forwardRef } from 'react';
 import {
   getMyAddresses,
   getAddressesByUserId,
@@ -8,6 +8,9 @@ import { createPackage, getMyPackages, updatePackage } from '../../services/pack
 import api from '../../utils/axiosInstance';
 import { getAllCouriers } from '../../services/courierService';
 import { toast } from 'react-toastify';
+import { User, Package, Truck, MapPin, Calendar, FileText, DollarSign, Shield, CheckCircle } from 'lucide-react';
+import ReactDatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 const steps = [
   'Sender',
@@ -17,6 +20,24 @@ const steps = [
   'Shipment Details',
   'Review',
 ];
+
+const DatePickerInput = forwardRef(({ value, onClick, onChange, placeholder }, ref) => (
+  <div className="relative w-full">
+    <input
+      type="text"
+      readOnly
+      ref={ref}
+      value={value || ""}
+      onClick={onClick}
+      onChange={onChange}
+      placeholder={placeholder}
+      className="w-full h-[48px] px-4 pr-12 py-3 border border-orange-200 rounded-xl bg-white text-gray-700 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 shadow-sm placeholder-gray-400 hover:shadow-md text-base cursor-pointer"
+    />
+    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center h-full pointer-events-none">
+      <Calendar className="w-5 h-5 text-orange-400" />
+    </div>
+  </div>
+));
 
 const ShipmentForm = ({
   mode = 'create',
@@ -207,7 +228,6 @@ const ShipmentForm = ({
     setError('');
   };
 
-  // Helper to get current datetime-local string (YYYY-MM-DDTHH:MM)
   const getNowDatetimeLocal = () => {
     const now = new Date();
     const pad = (n) => n.toString().padStart(2, '0');
@@ -216,85 +236,102 @@ const ShipmentForm = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Validate pickup_date is not in the past
-    const now = new Date();
-    const pickupDate = new Date(form.pickup_date);
-    if (pickupDate < now) {
-      setError('Pickup date/time cannot be in the past.');
+    setError('');
+
+    // Validate all required fields
+    const requiredFields = [
+      'recipient_name',
+      'recipient_street',
+      'recipient_city',
+      'recipient_state',
+      'recipient_country',
+      'recipient_postal_code',
+      'recipient_email',
+      'recipient_phone',
+      'package_type',
+      'weight',
+      'length',
+      'width',
+      'height',
+      'currency_id',
+      'final_cost',
+      'courier_id',
+      'pickup_address_id',
+      'pickup_date',
+    ];
+
+    const missingFields = requiredFields.filter(field => !form[field]);
+    if (missingFields.length > 0) {
+      setError(`Please fill all required fields: ${missingFields.join(', ')}`);
       return;
     }
-    if (onSubmit) {
+
+    // Validate email
+    if (!validateEmail(form.recipient_email)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
       try {
-        // Extract package details from form
+      // Create delivery address text
+      const deliveryAddressText = [
+        form.recipient_name,
+        form.recipient_street,
+        form.recipient_city,
+        form.recipient_state,
+        form.recipient_country,
+        form.recipient_postal_code,
+      ].filter(Boolean).join(', ');
+
+      // Create package first
         const packageData = {
-          package_type: form.package_type,
+        type: form.package_type,
           weight: parseFloat(form.weight),
           length: parseFloat(form.length),
           width: parseFloat(form.width),
           height: parseFloat(form.height),
           is_negotiable: form.is_negotiable,
-          currency_id: parseInt(form.currency_id),
-          final_cost: parseFloat(form.final_cost)
+        currency_id: form.currency_id,
+        estimated_cost: parseFloat(form.final_cost),
+        final_cost: parseFloat(form.final_cost),
         };
 
-        let packageId = form.package_id;
+      let packageResponse;
         if (mode === 'update' && initialValues.package_id) {
-          // Compare fields to see if any package fields have changed
-          const fields = [
-            'package_type', 'weight', 'length', 'width', 'height', 'is_negotiable', 'currency_id', 'final_cost'
-          ];
-          let changed = false;
-          for (const field of fields) {
-            if (packageData[field] !== initialValues[field]) {
-              changed = true;
-              break;
-            }
-          }
-          if (changed) {
-            // Update the package
-            await updatePackage(initialValues.package_id, packageData);
-          }
-          packageId = initialValues.package_id;
+        packageResponse = await updatePackage(initialValues.package_id, packageData);
         } else {
-          // Create package first
-          const packageResponse = await createPackage(packageData);
-          packageId = packageResponse.data.id;
+        packageResponse = await createPackage(packageData);
         }
 
-        // Concatenate address fields into delivery_address_text
-        const delivery_address_text = `${form.recipient_name}, ${form.recipient_street}, ${form.recipient_city}, ${form.recipient_state}, ${form.recipient_country}, ${form.recipient_postal_code}`;
-
-        // Prepare shipment data with all required fields
-        const finalShipmentData = {
-          // Recipient details
+      // Create shipment data
+      const shipmentData = {
           recipient_name: form.recipient_name,
+        recipient_street: form.recipient_street,
+        recipient_city: form.recipient_city,
+        recipient_state: form.recipient_state,
+        recipient_country: form.recipient_country,
+        recipient_postal_code: form.recipient_postal_code,
+        delivery_address_text: deliveryAddressText,
           recipient_email: form.recipient_email,
           recipient_phone: form.recipient_phone,
-          delivery_address_text: delivery_address_text,
-          
-          // Shipment details - ensure required fields are not undefined
-          courier_id: parseInt(form.courier_id, 10),
-          pickup_address_id: parseInt(form.pickup_address_id, 10),
-          shipment_type: form.shipment_type,
+        courier_id: form.courier_id,
+        pickup_address_id: form.pickup_address_id,
           pickup_date: new Date(form.pickup_date).toISOString(),
-          special_instructions: form.special_instructions || "",
-          insurance_required: !!form.insurance_required,
-          signature_required: !!form.signature_required,
-          
-          // Package ID from created/updated package
-          package_id: packageId,
+        special_instructions: form.special_instructions,
+        insurance_required: form.insurance_required,
+        signature_required: form.signature_required,
+        package_id: packageResponse.data.id,
         };
 
-        console.log("Final shipment data being sent:", finalShipmentData);
-        console.log("Package data:", packageData);
-        console.log("Package ID:", packageId);
+      const finalShipmentData = {
+        ...shipmentData,
+        ...(mode === 'update' && { id: initialValues.id }),
+      };
 
         await onSubmit(finalShipmentData);
       } catch (err) {
         toast.error('Failed to create shipment');
-      }
     }
-    setSubmitting(false);
   };
 
   const disabled = readOnly;
@@ -322,175 +359,440 @@ const ShipmentForm = ({
   const isLastStep = step === steps.length - 1;
 
   return (
-    <>
-      {/* 1. Wrap the form in a gradient background */}
-      {/* Outer container: fill all available space after sidebar and navbar */}
-      <div className="min-h-screen w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-orange-100 px-0 py-0">
-        <form onSubmit={handleSubmit} className="w-full h-full max-w-3xl bg-white shadow-2xl rounded-3xl p-8 space-y-8 transition-all duration-300">
-          {/* Stepper with divider */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              {steps.map((s, idx) => (
-                <div key={s} className="flex-1 flex flex-col items-center transition-all duration-300">
-                  <div className={`w-9 h-9 flex items-center justify-center rounded-full font-bold text-lg border-2 ${
-                    idx < step
-                      ? 'bg-orange-500 text-white border-orange-500'
-                      : idx === step
-                      ? 'bg-white text-orange-500 border-orange-500 shadow-lg'
-                      : 'bg-gray-100 text-gray-400 border-gray-200'
-                  }`}>
-                    {idx < step ? (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      idx + 1
-                    )}
-                  </div>
-                  <span className={`mt-3 text-xs font-light tracking-wide ${idx === step ? 'text-orange-500' : 'text-gray-400'}`}>{s}</span>
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50">
+      <div className="p-4 sm:p-6 lg:p-8">
+        {/* Header Section */}
+        <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl shadow-lg mb-6 overflow-hidden">
+          <div className="p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                  <Package className="w-5 h-5 text-white" />
                 </div>
-              ))}
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-white mb-1">
+                    {mode === 'update' ? 'Update Shipment' : 'Create New Shipment'}
+                  </h1>
+                  <p className="text-orange-100 text-sm">
+                    {mode === 'update' ? 'Modify your shipment details' : 'Fill in the details to create your shipment'}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="border-b border-gray-200 mb-6"></div>
           </div>
-          {/* Error message */}
-          {error && <div className="text-red-500 text-center font-semibold mb-4">{error}</div>}
-          {/* All form fields in a single column, each with label and input */}
-          <div className="space-y-6">
-            {step === 0 && (
-              <>
-                <label className="block font-bold mb-2">Sender Name</label>
-                <input value={user?.first_name + ' ' + user?.last_name} readOnly className="w-full bg-gray-50 text-gray-700 border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400 mb-4 transition-all" />
-                <label className="block font-bold mb-2">Sender Email</label>
-                <input value={user?.email} readOnly className="w-full bg-gray-50 text-gray-700 border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400 transition-all" />
-              </>
-            )}
-            {step === 1 && (
-              <>
-                <label className="block font-bold mb-2">Full Name</label>
-                <input type="text" name="recipient_name" placeholder="Full Name" value={form.recipient_name || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400" />
-                <label className="block font-bold mb-2">Email</label>
-                <input type="email" name="recipient_email" placeholder="Email" value={form.recipient_email || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400" />
-                <label className="block font-bold mb-2">Phone</label>
-                <input type="text" name="recipient_phone" placeholder="Phone" value={form.recipient_phone || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400" />
-                <label className="block font-bold mb-2">Street Address</label>
-                <input type="text" name="recipient_street" placeholder="Street Address" value={form.recipient_street || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400" />
-                <label className="block font-bold mb-2">City</label>
-                <input type="text" name="recipient_city" placeholder="City" value={form.recipient_city || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400" />
-                <label className="block font-bold mb-2">State</label>
-                <input type="text" name="recipient_state" placeholder="State" value={form.recipient_state || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400" />
-                <label className="block font-bold mb-2">Country</label>
-                <input type="text" name="recipient_country" placeholder="Country" value={form.recipient_country || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400" />
-                <label className="block font-bold mb-2">Postal Code</label>
-                <input type="text" name="recipient_postal_code" placeholder="Postal Code" value={form.recipient_postal_code || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400" />
-              </>
-            )}
-            {step === 2 && (
-              <>
-                <label className="block font-bold mb-2">Package Type</label>
-                <select name="package_type" value={form.package_type || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 text-gray-700 bg-white transition-all">
-                  <option value="">Select Package Type</option>
-                  {packageTypes.map((type) => (
+        </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-3 h-3 text-red-500" />
+              </div>
+              <p className="text-red-700 font-medium text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Form Container */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Sender Section */}
+          <div className="bg-white/90 backdrop-blur-sm border border-orange-100 rounded-2xl shadow-md p-6 hover:shadow-lg transition-all duration-300">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl flex items-center justify-center shadow-md">
+                <User className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-800">Sender Information</h2>
+                <p className="text-sm text-gray-600">Your contact details</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
+                <input
+                  type="text"
+                  value={`${user?.first_name || ''} ${user?.last_name || ''}`}
+                  readOnly
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-700 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 shadow-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                <input
+                  type="email"
+                  value={user?.email || ''}
+                  readOnly
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-700 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-200 shadow-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Recipient Section */}
+          <div className="bg-white/90 backdrop-blur-sm border border-orange-100 rounded-2xl shadow-md p-6 hover:shadow-lg transition-all duration-300">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl flex items-center justify-center shadow-md">
+                <User className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-800">Recipient Information</h2>
+                <p className="text-sm text-gray-600">Who will receive the package</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
+              <input
+                type="text"
+                name="recipient_name"
+                value={form.recipient_name || ""}
+                onChange={handleChange}
+                  required 
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-gray-400 transition-all duration-200 shadow-sm hover:shadow-md" 
+                  placeholder=""
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address *</label>
+                <input 
+                  type="email" 
+                  name="recipient_email" 
+                  value={form.recipient_email || ""} 
+                  onChange={handleChange} 
+                  required 
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-gray-400 transition-all duration-200 shadow-sm hover:shadow-md" 
+                  placeholder=""
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number *</label>
+                <input 
+                  type="tel" 
+                  name="recipient_phone" 
+                  value={form.recipient_phone || ""} 
+                  onChange={handleChange} 
+                required
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-gray-400 transition-all duration-200 shadow-sm hover:shadow-md" 
+                  placeholder=""
+              />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Street Address *</label>
+              <input
+                type="text"
+                name="recipient_street"
+                value={form.recipient_street || ""}
+                onChange={handleChange}
+                required
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-gray-400 transition-all duration-200 shadow-sm hover:shadow-md" 
+                  placeholder=""
+              />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">City *</label>
+              <input
+                type="text"
+                name="recipient_city"
+                value={form.recipient_city || ""}
+                onChange={handleChange}
+                required
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-gray-400 transition-all duration-200 shadow-sm hover:shadow-md" 
+                  placeholder=""
+              />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">State/Province *</label>
+              <input
+                type="text"
+                name="recipient_state"
+                value={form.recipient_state || ""}
+                onChange={handleChange}
+                required
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-gray-400 transition-all duration-200 shadow-sm hover:shadow-md" 
+                  placeholder=""
+              />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Country *</label>
+              <input
+                type="text"
+                name="recipient_country"
+                value={form.recipient_country || ""}
+                onChange={handleChange}
+                required
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-gray-400 transition-all duration-200 shadow-sm hover:shadow-md" 
+                  placeholder=""
+              />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Postal Code *</label>
+              <input
+                type="text"
+                name="recipient_postal_code"
+                value={form.recipient_postal_code || ""}
+                onChange={handleChange}
+                required
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-gray-400 transition-all duration-200 shadow-sm hover:shadow-md" 
+                  placeholder=""
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Package Details Section */}
+          <div className="bg-white/90 backdrop-blur-sm border border-orange-100 rounded-2xl shadow-md p-6 hover:shadow-lg transition-all duration-300">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl flex items-center justify-center shadow-md">
+                <Package className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-800">Package Details</h2>
+                <p className="text-sm text-gray-600">Physical package information</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Package Type *</label>
+              <select
+                name="package_type"
+                value={form.package_type || ""}
+                onChange={handleChange}
+                required
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-700 bg-white transition-all duration-200 shadow-sm hover:shadow-md"
+              >
+                <option value="">Select Package Type</option>
+                {packageTypes.map((type) => (
                     <option key={type} value={type}>
                       {type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                     </option>
-                  ))}
-                </select>
-                <label className="block font-bold mb-2">Weight (kg)</label>
-                <input type="number" name="weight" placeholder="Weight (kg)" value={form.weight || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400" />
-                <label className="block font-bold mb-2">Length (cm)</label>
-                <input type="number" name="length" placeholder="Length (cm)" value={form.length || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400" />
-                <label className="block font-bold mb-2">Width (cm)</label>
-                <input type="number" name="width" placeholder="Width (cm)" value={form.width || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400" />
-                <label className="block font-bold mb-2">Height (cm)</label>
-                <input type="number" name="height" placeholder="Height (cm)" value={form.height || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400" />
-                <label className="block font-bold mb-2">Currency</label>
-                <select name="currency_id" value={form.currency_id || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 text-gray-700 bg-white transition-all">
-                  <option value="">Select Currency</option>
-                  {currencies.map((currency, idx) => (
-                    <option key={currency.id || idx} value={currency.id}>{currency.currency}</option>
-                  ))}
-                </select>
-                <label className="block font-bold mb-2">Price</label>
-                <input type="number" name="final_cost" placeholder="Price" value={form.final_cost || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400" />
-                <div className="flex items-center gap-6 mt-4">
-                  <label className="flex items-center text-gray-500 text-sm">
-                    <input type="checkbox" name="is_negotiable" checked={form.is_negotiable} onChange={handleChange} disabled={disabled} className="mr-2 accent-orange-500" /> Negotiable
-                  </label>
-                </div>
-              </>
-            )}
-            {step === 3 && (
-              <>
-                <label className="block font-bold mb-2">Supplier</label>
-                <select name="courier_id" value={form.courier_id || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 text-gray-700 bg-white transition-all">
-                  <option value="">Select Supplier</option>
-                  {couriers.map((courier, idx) => (
-                    <option key={courier.id || idx} value={courier.id}>{courier.first_name} {courier.last_name}</option>
-                  ))}
-                </select>
-              </>
-            )}
-            {step === 4 && (
-              <>
-                <label className="block font-bold mb-2">Pickup Address</label>
-                <select name="pickup_address_id" value={form.pickup_address_id || ""} onChange={handleChange} disabled={disabled} required className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 text-gray-700 bg-white mb-4 transition-all">
-                  <option value="">Select Pickup Address</option>
-                  {pickupAddresses.map((address, idx) => (
-                    <option key={address.id || idx} value={address.id}>{formatAddress(address)}</option>
-                  ))}
-                </select>
-                <label className="block font-bold mb-2">Pickup Date/Time</label>
-                <input type="datetime-local" name="pickup_date" value={form.pickup_date || ""} onChange={handleChange} disabled={disabled} required min={getNowDatetimeLocal()} className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400 mb-4 transition-all" />
-                <label className="block font-bold mb-2">Special Instructions (Optional)</label>
-                <textarea name="special_instructions" placeholder="Special Instructions (Optional)" value={form.special_instructions || ""} onChange={handleChange} disabled={disabled} className="w-full border-0 border-b border-gray-200 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 placeholder-gray-400 mb-4 transition-all" rows="3" />
-                <div className="flex items-center gap-6 mt-4">
-                  <label className="flex items-center text-gray-500 text-sm">
-                    <input type="checkbox" name="insurance_required" checked={form.insurance_required} onChange={handleChange} disabled={disabled} className="mr-2 accent-orange-500" /> Insurance Required
-                  </label>
-                  <label className="flex items-center text-gray-500 text-sm">
-                    <input type="checkbox" name="signature_required" checked={form.signature_required} onChange={handleChange} disabled={disabled} className="mr-2 accent-orange-500" /> Signature Required
-                  </label>
-                </div>
-              </>
-            )}
-            {step === 5 && (
-              <div>
-                <div className="text-2xl font-extrabold mb-6">Review Shipment Details</div>
-                <div className="space-y-2 text-base text-gray-700">
-                  <div className="flex flex-wrap gap-4">
-                    <div><span className="font-semibold">Recipient:</span> {form.recipient_name}</div>
-                    <div><span className="font-semibold">Email:</span> {form.recipient_email}</div>
-                    <div><span className="font-semibold">Phone:</span> {form.recipient_phone}</div>
-                    <div><span className="font-semibold">Delivery Address:</span> {form.recipient_name}, {form.recipient_street}, {form.recipient_city}, {form.recipient_state}, {form.recipient_country}, {form.recipient_postal_code}</div>
-                    <div><span className="font-semibold">Package Type:</span> {form.package_type}</div>
-                    <div><span className="font-semibold">Weight:</span> {form.weight}kg</div>
-                    <div><span className="font-semibold">Dimensions:</span> {form.length}x{form.width}x{form.height}cm</div>
-                    <div><span className="font-semibold">Price:</span> ${form.final_cost}</div>
-                    <div><span className="font-semibold">Pickup Date:</span> {form.pickup_date}</div>
-                    {form.special_instructions && <div><span className="font-semibold">Special Instructions:</span> {form.special_instructions}</div>}
-                  </div>
-                </div>
+                ))}
+              </select>
               </div>
-            )}
-          </div>
-          {/* Sticky Navigation Bar */}
-          {showStickyNav && (
-            <div className="sticky bottom-0 left-0 w-full bg-white border-t border-gray-100 px-0 py-4 z-10 flex gap-2 justify-between">
-              {!isFirstStep && (
-                <button type="button" onClick={handleBack} className="flex-1 bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-semibold hover:bg-gray-200 transition-all">Back</button>
-              )}
-              {!isLastStep && (
-                <button type="button" onClick={handleNext} className="flex-1 bg-orange-500 text-white py-3 px-4 rounded-xl font-semibold shadow-lg hover:bg-orange-600 hover:shadow-xl transition-all">Next: {steps[step + 1]}</button>
-              )}
-              {isLastStep && (
-                <button type="submit" className="flex-1 bg-orange-500 text-white py-3 px-4 rounded-xl font-semibold shadow-lg hover:bg-orange-600 hover:shadow-xl transition-all">{mode === 'update' ? 'Update Shipment' : 'Create Shipment'}</button>
-              )}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Weight (kg) *</label>
+              <input
+                type="number"
+                name="weight"
+                value={form.weight || ""}
+                onChange={handleChange}
+                required
+                  step="0.01"
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-gray-400 transition-all duration-200 shadow-sm hover:shadow-md" 
+                  placeholder=""
+              />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Length (cm) *</label>
+              <input
+                type="number"
+                name="length"
+                value={form.length || ""}
+                onChange={handleChange}
+                required
+                  step="0.1"
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-gray-400 transition-all duration-200 shadow-sm hover:shadow-md" 
+                  placeholder=""
+              />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Width (cm) *</label>
+              <input
+                type="number"
+                name="width"
+                value={form.width || ""}
+                onChange={handleChange}
+                required
+                  step="0.1"
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-gray-400 transition-all duration-200 shadow-sm hover:shadow-md" 
+                  placeholder=""
+              />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Height (cm) *</label>
+              <input
+                type="number"
+                name="height"
+                value={form.height || ""}
+                onChange={handleChange}
+                required
+                  step="0.1"
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-gray-400 transition-all duration-200 shadow-sm hover:shadow-md" 
+                  placeholder=""
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Currency *</label>
+              <select
+                name="currency_id"
+                value={form.currency_id || ""}
+                onChange={handleChange}
+                required
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-700 bg-white transition-all duration-200 shadow-sm hover:shadow-md"
+              >
+                <option value="">Select Currency</option>
+                  {currencies.map((currency, idx) => (
+                    <option key={currency.id || idx} value={currency.id}>
+                      {currency.currency}
+                    </option>
+                ))}
+              </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Price *</label>
+              <input
+                type="number"
+                name="final_cost"
+                value={form.final_cost || ""}
+                onChange={handleChange}
+                required
+                  step="0.01"
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-gray-400 transition-all duration-200 shadow-sm hover:shadow-md" 
+                  placeholder=""
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="flex items-center gap-3 text-gray-700 p-3 bg-orange-50 rounded-xl border border-orange-100">
+                  <input 
+                    type="checkbox" 
+                    name="is_negotiable" 
+                    checked={form.is_negotiable} 
+                    onChange={handleChange} 
+                    className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500" 
+              />
+                  <span className="text-sm font-semibold">Price is negotiable</span>
+                </label>
+              </div>
             </div>
-          )}
-        </form>
+          </div>
+
+          {/* Supplier Section */}
+          <div className="bg-white/90 backdrop-blur-sm border border-orange-100 rounded-2xl shadow-md p-6 hover:shadow-lg transition-all duration-300">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl flex items-center justify-center shadow-md">
+                <Truck className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-800">Select Supplier</h2>
+                <p className="text-sm text-gray-600">Choose who will handle your shipment</p>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Supplier *</label>
+              <select
+                name="courier_id"
+                value={form.courier_id || ""}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-700 bg-white transition-all duration-200 shadow-sm hover:shadow-md"
+              >
+                <option value="">Select Supplier</option>
+                {couriers.map((courier, idx) => (
+                  <option key={courier.id || idx} value={courier.id}>
+                    {courier.first_name} {courier.last_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Shipment Details Section */}
+          <div className="bg-white/90 backdrop-blur-sm border border-orange-100 rounded-2xl shadow-md p-6 hover:shadow-lg transition-all duration-300">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl flex items-center justify-center shadow-md">
+                <FileText className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-800">Shipment Details</h2>
+                <p className="text-sm text-gray-600">Additional shipment information</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Pickup Address *</label>
+              <select
+                name="pickup_address_id"
+                value={form.pickup_address_id || ""}
+                onChange={handleChange}
+                required
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-700 bg-white transition-all duration-200 shadow-sm hover:shadow-md"
+              >
+                <option value="">Select Pickup Address</option>
+                  {pickupAddresses.map((address, idx) => (
+                    <option key={address.id || idx} value={address.id}>
+                    {formatAddress(address)}
+                  </option>
+                ))}
+              </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Pickup Date & Time *</label>
+                <ReactDatePicker
+                  selected={form.pickup_date ? new Date(form.pickup_date) : null}
+                  onChange={date => handleChange({ target: { name: "pickup_date", value: date } })}
+                  showTimeSelect
+                  timeFormat="HH:mm"
+                  timeIntervals={15}
+                  dateFormat="yyyy-MM-dd HH:mm"
+                  minDate={new Date()}
+                  placeholderText="Select pickup date & time"
+                  name="pickup_date"
+                  id="pickup_date"
+                  autoComplete="off"
+                  customInput={<DatePickerInput />}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Special Instructions (Optional)</label>
+              <textarea
+                name="special_instructions"
+                value={form.special_instructions || ""}
+                onChange={handleChange}
+                rows="3"
+                  className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-gray-400 resize-none transition-all duration-200 shadow-sm hover:shadow-md" 
+                  placeholder=""
+              />
+              </div>
+              <div className="md:col-span-2 flex flex-wrap gap-4">
+                <label className="flex items-center gap-3 text-gray-700 p-3 bg-orange-50 rounded-xl border border-orange-100 flex-1">
+                <input
+                  type="checkbox"
+                  name="insurance_required"
+                  checked={form.insurance_required}
+                  onChange={handleChange}
+                    className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500" 
+                />
+                  <Shield className="w-4 h-4 text-orange-500" />
+                  <span className="text-sm font-semibold">Insurance Required</span>
+              </label>
+                <label className="flex items-center gap-3 text-gray-700 p-3 bg-orange-50 rounded-xl border border-orange-100 flex-1">
+                <input
+                  type="checkbox"
+                  name="signature_required"
+                  checked={form.signature_required}
+                  onChange={handleChange}
+                    className="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500" 
+                />
+                  <CheckCircle className="w-4 h-4 text-orange-500" />
+                  <span className="text-sm font-semibold">Signature Required</span>
+              </label>
+              </div>
+            </div>
+        </div>
+
+          {/* Submit Button */}
+          <div className="flex justify-end">
+              <button
+                type="submit"
+              className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white px-8 py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-lg flex items-center gap-3"
+              >
+              <DollarSign className="w-5 h-5" />
+                {mode === 'update' ? 'Update Shipment' : 'Create Shipment'}
+              </button>
+          </div>
+      </form>
       </div>
-    </>
+    </div>
   );
 };
 

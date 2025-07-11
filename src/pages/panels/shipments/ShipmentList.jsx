@@ -1,6 +1,7 @@
 // src/pages/panels/shipments/ShipmentList.jsx
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getAllShipments } from '../../../services/shipmentService';
 // import { useNavigate, useSearchParams } from 'react-router-dom';
 // import { getAllShipments, getShipmentById } from '../../../services/shipmentService';
 // import { validateToken, logout } from '../../../utils/auth';
@@ -37,32 +38,29 @@ const ShipmentList = () => {
   // }, []);
 
   // Fetch shipments
-  // useEffect(() => {
-  //   const fetchShipments = async () => {
-  //     try {
-  //       let response;
-
-  //       if (userType === 'super_admin') {
-  //         const filters = filterUserId ? { user_id: filterUserId } : {};
-  //         response = await getAllShipments(filters);
-  //       } else {
-  //         response = await getAllShipments({
-  //           sender_id: userId,
-  //           recipient_id: userId,
-  //         });
-  //       }
-
-  //       setShipments(response.data.results || []);
-  //     } catch (err) {
-  //       console.error(err);
-  //       setError('Failed to load shipments.');
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-
-  //   fetchShipments();
-  // }, [filterUserId]);
+  useEffect(() => {
+    const fetchShipments = async () => {
+      try {
+        let response;
+        if (userType === 'super_admin') {
+          const filters = filterUserId ? { user_id: filterUserId } : {};
+          response = await getAllShipments(filters);
+        } else {
+          response = await getAllShipments({
+            sender_id: userId,
+            recipient_id: userId,
+          });
+        }
+        setShipments(response.results || []);
+      } catch (err) {
+        console.error(err);
+        setError('Failed to load shipments.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchShipments();
+  }, [filterUserId]);
 
   // Open modal if ?view=id is in URL
   // useEffect(() => {

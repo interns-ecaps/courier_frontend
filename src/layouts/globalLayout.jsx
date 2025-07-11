@@ -34,7 +34,7 @@ export default function GlobalLayout({ children }) {
             <main className="flex-1 flex flex-col min-h-0 w-full md:p-8 p-2 transition-all duration-300">
                 {/* Header */}
                 <Navbar />
-                <div className="flex-1 min-h-0 flex flex-col w-full">{children}</div>
+                <div className="flex-1 min-h-0 h-full flex flex-col w-full">{children}</div>
             </main>
         </div>
     );
