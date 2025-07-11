@@ -4,18 +4,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../../../components/common/Navbar";
 import { getAllShipments, updateShipmentStatus, cancelShipment as cancelShipmentApi, acceptShipment, rejectShipment } from "../../../services/shipmentService";
+import { getPackageById } from "../../../services/packageService";
 import { toast } from "react-toastify";
-
-const shipmentFields = [
-    { key: "id", label: "ID" },
-    { key: "sender_name", label: "Sender" },
-    { key: "recipient_name", label: "Recipient" },
-    { key: "supplier_name", label: "Supplier" },
-    { key: "status_type", label: "Status" },
-    { key: "pickup_date", label: "Pickup Date" },
-    { key: "estimated_delivery", label: "ETA" },
-    { key: "tracking_number", label: "Tracking #" },
-];
 
 export default function Shipment() {
     const [user, setUser] = useState(null);
@@ -91,6 +81,24 @@ export default function Shipment() {
                 console.log("Parsed shipments:", shipmentResults);
                 console.log("First shipment sample:", shipmentResults[0]);
 
+                // Fetch all unique packageIds
+                const uniquePackageIds = [...new Set(shipmentResults.map(s => s.package_id).filter(Boolean))];
+                const packageMap = {};
+                await Promise.all(uniquePackageIds.map(async (pid) => {
+                    try {
+                        const res = await getPackageById(pid);
+                        packageMap[pid] = res.data;
+                    } catch (e) {
+                        packageMap[pid] = null;
+                    }
+                }));
+
+                // Attach final_cost to each shipment
+                shipmentResults = shipmentResults.map(s => ({
+                    ...s,
+                    final_cost: packageMap[s.package_id]?.final_cost ?? null
+                }));
+
                 setShipments(shipmentResults);
 
             } catch (error) {
@@ -106,7 +114,7 @@ export default function Shipment() {
     const handleStatusUpdate = async (shipmentId, newStatus) => {
         try {
             await updateShipmentStatus(shipmentId, { status: newStatus });
-            setShipments((prev) =>
+        setShipments((prev) =>
                 prev.map((shipment) =>
                     shipment.id === shipmentId ? { ...shipment, status_type: newStatus } : shipment
                 )
@@ -279,47 +287,62 @@ export default function Shipment() {
         navigator.clipboard.writeText(text);
     };
 
+    const baseShipmentFields = [
+        { key: "serial", label: "S/N" },
+        { key: "sender_name", label: "Sender" },
+        { key: "recipient_name", label: "Recipient" },
+        { key: "supplier_name", label: "Supplier" },
+        { key: "status_type", label: "Status" },
+        { key: "pickup_date", label: "Pickup Date" },
+        { key: "estimated_delivery", label: "ETA" },
+        { key: "tracking_number", label: "Tracking #" },
+        { key: "price", label: "Price" },
+    ];
+    const shipmentFields = (user?.user_type === 'importer_exporter')
+        ? baseShipmentFields.filter(f => f.key !== 'sender_name')
+        : baseShipmentFields;
+
     const ShipmentsListing = () => (
         <div className="min-h-screen p-8" style={{ background: '#fff7f0' }}>
-            <div className="max-w-7xl mx-auto">
-                {/* Header */}
-                <div className="mb-8">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                                Shipments Management
-                            </h1>
-                            <p className="text-gray-600 mt-2">Track and manage all your shipments in one place</p>
-                        </div>
-                        {(user?.user_type === "importer_exporter" || user?.user_type === "super_admin") && (
-                            <button
-                                onClick={handleCreate}
-                                className="bg-orange-500 text-white px-4 py-2 rounded shadow hover:bg-orange-600"
-                            >
-                                Create Shipment
-                            </button>
-                        )}
+            {/* Header */}
+            <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                            Shipments Management
+                        </h1>
+                        <p className="text-gray-600 mt-2">Track and manage all your shipments in one place</p>
                     </div>
+                    {(user?.user_type === "importer_exporter" || user?.user_type === "super_admin") && (
+                    <button
+                        onClick={handleCreate}
+                            className="bg-orange-500 text-white px-4 py-2 rounded shadow hover:bg-orange-600"
+                    >
+                        Create Shipment
+                    </button>
+                    )}
+                </div>
                 </div>
 
                 <Tabs />
 
-                {/* Table Container */}
-                <div className="bg-white rounded-2xl shadow-lg p-6 border border-orange-100">
-                    <div className="overflow-x-auto w-full">
+            {/* Table Container */}
+            <div className="max-w-5xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-lg border border-orange-100 w-full">
+                    <div className="overflow-x-auto p-6">
                         <table className="w-full">
                             <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                                 <tr>
                                     {shipmentFields.map((field) => (
-                                        <th key={field.key} className="py-4 px-6 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                                        <th key={field.key} className="py-2 px-3 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
                                             {field.label}
                                         </th>
                                     ))}
-                                    <th className="py-4 px-6 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                                    <th className="py-2 px-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
+                        </tr>
+                    </thead>
 
                             <tbody className="divide-y divide-gray-100">
                                 {loading && (
@@ -333,7 +356,7 @@ export default function Shipment() {
                                     </tr>
                                 )}
                                 {!loading && filteredShipments.length === 0 && (
-                                    <tr>
+                            <tr>
                                         <td colSpan={shipmentFields.length + 1} className="py-16 text-center">
                                             <div className="flex flex-col items-center gap-4">
                                                 <div className="text-6xl opacity-50">📦</div>
@@ -342,9 +365,9 @@ export default function Shipment() {
                                                     <p className="text-sm">No shipments match your current filter criteria.</p>
                                                 </div>
                                             </div>
-                                        </td>
-                                    </tr>
-                                )}
+                                </td>
+                            </tr>
+                        )}
                                 {!loading && filteredShipments.map((shipment, index) => {
                                     const showDecisionButtons =
                                         user?.user_type === "supplier" &&
@@ -354,7 +377,23 @@ export default function Shipment() {
                                     return (
                                         <tr key={shipment.id} className="hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-purple-50/50 transition-all duration-300 group">
                                             {shipmentFields.map((field) => {
-                                                let value = shipment[field.key];
+                                                let value;
+                                                if (field.key === 'serial') {
+                                                    value = index + 1;
+                                                } else {
+                                                    value = shipment[field.key];
+                                                }
+                                                let cellClass = "py-2 px-3 text-sm text-gray-700";
+                                                // Make wide columns truncate
+                                                if (["tracking_number", "supplier_name", "recipient_name"].includes(field.key)) {
+                                                    cellClass += " max-w-[10rem] truncate";
+                                                }
+
+                                                // For price, use shipment.final_cost
+                                                if (field.key === "price") {
+                                                    value = shipment.final_cost;
+                                                    value = value !== undefined && value !== null ? `₹${value}` : <span className="text-gray-400 italic">N/A</span>;
+                                                }
 
                                                 // Format status_type (capitalize first letter)
                                                 if (field.key === "status_type" && typeof value === "string") {
@@ -372,7 +411,12 @@ export default function Shipment() {
                                                 if (field.key === "tracking_number" && value) {
                                                     value = (
                                                         <div className="flex items-center gap-2">
-                                                            <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded-lg">{value}</span>
+                                                            <span
+                                                                className="font-mono text-sm bg-gray-100 px-2 py-1 rounded-lg max-w-xs truncate inline-block whitespace-nowrap"
+                                                                title={value}
+                                                            >
+                                                                {value}
+                                                            </span>
                                                             <button
                                                                 aria-label="Copy tracking number"
                                                                 onClick={() => copyToClipboard(value)}
@@ -385,26 +429,26 @@ export default function Shipment() {
                                                 }
 
                                                 return (
-                                                    <td key={field.key} className="py-4 px-6 text-sm text-gray-700">
+                                                    <td key={field.key} className={cellClass} title={typeof value === 'string' ? value : undefined}>
                                                         {value ?? <span className="text-gray-400 italic">N/A</span>}
                                                     </td>
                                                 );
                                             })}
-                                            <td className="py-4 px-6">
+                                            <td className="py-2 px-3">
                                                 <div className="flex items-center justify-center gap-2">
-                                                    <button
-                                                        title="View Details"
+                                    <button
+                                        title="View Details"
                                                         aria-label={`View shipment ${shipment.id}`}
-                                                        onClick={() => handleView(shipment.id)}
+                                        onClick={() => handleView(shipment.id)}
                                                         className="p-2 hover:bg-gray-100 rounded-full text-gray-600"
-                                                    >
+                                    >
                                                         <Eye size={18} />
-                                                    </button>
+                                    </button>
                                                     {user?.user_type !== "supplier" && !["cancelled", "delivered", "accepted"].includes(shipment.status_type?.toLowerCase()) && (
-                                                        <button
-                                                            title="Edit Shipment"
+                                    <button
+                                        title="Edit Shipment"
                                                             aria-label={`Edit shipment ${shipment.id}`}
-                                                            onClick={() => handleEdit(shipment)}
+                                        onClick={() => handleEdit(shipment)}
                                                             className="p-2 hover:bg-gray-100 rounded-full text-gray-600"
                                                         >
                                                             <Edit2 size={18} />
@@ -453,16 +497,16 @@ export default function Shipment() {
                                                                     <XCircle size={14} />
                                                                 )}
                                                                 Reject
-                                                            </button>
+                                    </button>
                                                         </div>
                                                     )}
                                                 </div>
-                                            </td>
-                                        </tr>
+                                </td>
+                            </tr>
                                     );
                                 })}
-                            </tbody>
-                        </table>
+                    </tbody>
+                </table>
                     </div>
                 </div>
             </div>
@@ -499,31 +543,9 @@ export default function Shipment() {
         </div>
     );
 
-    // Super Admin View: show all shipments in a simple table
+    // Super Admin View: use the same ShipmentsListing UI as other users
     if (user?.user_type === 'super_admin') {
-        return (
-            <div className="p-8">
-                <h1 className="text-3xl font-bold mb-6">All Shipments (Super Admin View)</h1>
-                <table className="min-w-full border text-sm text-left">
-                    <thead className="bg-gray-100">
-                        <tr>
-                            {shipmentFields.map((field) => (
-                                <th key={field.key} className="border px-4 py-2">{field.label}</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {shipments.map((shipment) => (
-                            <tr key={shipment.id}>
-                                {shipmentFields.map((field) => (
-                                    <td key={field.key} className="border px-4 py-2">{String(shipment[field.key] ?? '')}</td>
-                                ))}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        );
+        return <ShipmentsListing />;
     }
 
     return (
